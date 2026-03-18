@@ -107,10 +107,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (url.includes("/login")) {
+      const pageText = await activePage.evaluate(() =>
+        document.body?.innerText?.slice(0, 800) ?? ""
+      ).catch(() => "");
       await closeActive();
       return NextResponse.json({
         status: "error",
-        message: "Login failed — still on login page. Check FB_EMAIL/FB_PASSWORD.",
+        message: "Login failed — still on login page.",
+        pageText,
         url,
         title,
       });
