@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Next.js build output
+web/.next/
+web/out/
+
+# Environment — NEVER commit credentials
+web/.env.local
+web/.env*.local
+.env
+.env.local
+
+# Facebook session — contains auth tokens for your FB account
+fb_session/
+fb_session.tar.gz
+*.tar.gz
+
+# Local images (served from Firebase Storage in production)
+web/public/listing-images/
+
+# Debug artifacts
+debug_page.html
+debug_graphql.json
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code internal
+.claude/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+web/.next/
+
+# Misc
+.vercel

@@ -1,0 +1,25 @@
+# Build artifacts
+web/.next
+web/node_modules
+
+# Images served from Firebase Storage (no local copy needed)
+web/public/listing-images
+
+# Local dev only
+fb_session
+scrape.ts
+tsconfig.json
+package.json
+package-lock.json
+scripts
+
+# Debug artifacts
+debug_page.html
+debug_graphql.json
+
+# Docs (not needed in image)
+docs
+
+# Data files (served from Firebase RTDB)
+listings.json
+listings_firebase.json
