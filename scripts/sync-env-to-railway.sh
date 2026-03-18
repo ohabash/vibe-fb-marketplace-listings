@@ -47,7 +47,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   done
 
   echo "  Setting $KEY"
-  railway variables set "$KEY=$VAL"
+  railway variables --set "$KEY=$VAL"
   ((COUNT++))
 done < "$ENV_FILE"
 
