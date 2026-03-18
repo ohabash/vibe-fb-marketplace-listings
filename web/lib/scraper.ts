@@ -249,6 +249,9 @@ export async function scrapeUrl(url: string): Promise<Listing> {
 
       console.log("[scraper] Session expired — attempting re-login with FB_EMAIL...");
 
+      console.log(`[scraper] Pre-login URL: ${page.url()}`);
+      console.log(`[scraper] Pre-login title: ${await page.title()}`);
+
       await page.fill('input[name="email"]', email);
       await page.fill('input[name="pass"]', password);
       // Press Enter — more reliable than clicking the submit button (selector varies by FB version)
@@ -264,16 +267,30 @@ export async function scrapeUrl(url: string): Promise<Listing> {
         // URL didn't change — fall through to explicit login-form check below
       }
 
+      const postLoginUrl = page.url();
+      const postLoginTitle = await page.title();
+      console.log(`[scraper] Post-login URL: ${postLoginUrl}`);
+      console.log(`[scraper] Post-login title: ${postLoginTitle}`);
+
       const loginFailed = await page
         .locator('input[name="email"]')
         .isVisible()
         .catch(() => false);
 
+      console.log(`[scraper] Login form still visible: ${loginFailed}`);
+
+      // Log a snippet of the page HTML to help diagnose security challenges
+      const bodySnippet = await page.evaluate(() =>
+        document.body?.innerText?.slice(0, 500) ?? ""
+      ).catch(() => "");
+      console.log(`[scraper] Page text snippet: ${bodySnippet}`);
+
       if (loginFailed) {
         throw new Error(
-          "[scraper] Facebook re-login failed — login form still visible after submit. " +
-          "Possible causes: wrong FB_EMAIL/FB_PASSWORD, account locked, or Facebook is " +
-          "showing a security challenge. Check your credentials and try logging in manually."
+          `[scraper] Facebook re-login failed — login form still visible after submit. ` +
+          `Post-login URL: ${postLoginUrl} | Title: "${postLoginTitle}". ` +
+          `Possible causes: wrong FB_EMAIL/FB_PASSWORD, account locked, or Facebook is ` +
+          `showing a security challenge. Check Railway deploy logs for page text snippet.`
         );
       }
 
