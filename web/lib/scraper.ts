@@ -315,7 +315,16 @@ export async function scrapeUrl(url: string): Promise<Listing> {
         break;
       await page.waitForTimeout(1000);
     }
-    console.log(`[scraper] Page data found after ${Date.now() - start}ms`);
+    const elapsed = Date.now() - start;
+    const foundData = html.includes('"listing_photos"') || html.includes('"listing_price":{"amount":');
+    console.log(`[scraper] Page poll finished after ${elapsed}ms — data found: ${foundData}, url: ${page.url()}`);
+
+    if (!foundData) {
+      const snippet = await page.evaluate(() =>
+        document.body?.innerText?.slice(0, 800) ?? ""
+      ).catch(() => "");
+      console.warn(`[scraper] Page text at timeout:\n${snippet}`);
+    }
 
     const parsed = parseHTML(html);
     if (parsed.title) {
