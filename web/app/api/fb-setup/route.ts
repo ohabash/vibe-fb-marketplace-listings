@@ -79,14 +79,28 @@ export async function POST(req: NextRequest) {
     console.log(`[fb-setup] Post-login URL: ${url}`);
 
     if (url.includes("two_step_verification")) {
-      // FB is asking for a device verification code (sent to email/phone)
       const bodyText = await activePage.evaluate(() =>
-        document.body?.innerText?.slice(0, 400) ?? ""
+        document.body?.innerText?.slice(0, 600) ?? ""
       ).catch(() => "");
       console.log(`[fb-setup] Verification page text:\n${bodyText}`);
+
+      // Try to switch to email verification by clicking "Try Another Way"
+      const tryAnotherWay = activePage.locator('a:has-text("Try Another Way"), a:has-text("otra forma"), a:has-text("otra manera"), span:has-text("Try Another Way")').first();
+      const exists = await tryAnotherWay.isVisible().catch(() => false);
+      if (exists) {
+        console.log("[fb-setup] Clicking 'Try Another Way' to switch to email code...");
+        await tryAnotherWay.click();
+        await activePage.waitForTimeout(2000);
+        const afterText = await activePage.evaluate(() =>
+          document.body?.innerText?.slice(0, 600) ?? ""
+        ).catch(() => "");
+        console.log(`[fb-setup] After 'Try Another Way':\n${afterText}`);
+      }
+
       return NextResponse.json({
         status: "needs_code",
-        message: "FB sent a verification code to your email or phone. Submit it via POST {\"code\": \"XXXXXX\"}",
+        message: "FB requires device verification. Check your email, SMS, or Facebook app for a code or approval request. Submit code via POST {\"code\": \"XXXXXX\"} or approve via app then POST {\"approved\": true}",
+        pageText: bodyText,
         url,
         title,
       });
@@ -109,7 +123,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: "success", message: "Session saved to Firebase. Scraping should work now." });
   }
 
-  // ── Step 2: submit verification code ────────────────────────────────────
+  // ── Step 2a: user approved via FB app (no code needed) ──────────────────
+  if (body.approved) {
+    if (!activePage || !activeCtx) {
+      return NextResponse.json({ error: "No active login session. Call {\"start\": true} first." }, { status: 400 });
+    }
+    console.log("[fb-setup] Checking if FB app approval resolved the session...");
+    const url = activePage.url();
+    const stillBlocked = url.includes("two_step") || url.includes("/login");
+    if (stillBlocked) {
+      // Try clicking "Continue" or "Approve" button on the verification page
+      await activePage.locator('button:has-text("Continue"), button:has-text("Approve"), button:has-text("Continuar")').first().click().catch(() => {});
+      await activePage.waitForTimeout(3000);
+    }
+    const postUrl = activePage.url();
+    console.log(`[fb-setup] Post-approval URL: ${postUrl}`);
+    if (postUrl.includes("two_step") || postUrl.includes("/login")) {
+      return NextResponse.json({ status: "still_waiting", message: "Session still blocked. Try approving in the FB app or submit a code.", url: postUrl });
+    }
+    await closeActive();
+    await saveSessionToFirebase();
+    return NextResponse.json({ status: "success", message: "Session saved to Firebase. Scraping should work now." });
+  }
+
+  // ── Step 2b: submit verification code ────────────────────────────────────
   if (body.code) {
     if (!activePage || !activeCtx) {
       return NextResponse.json(
