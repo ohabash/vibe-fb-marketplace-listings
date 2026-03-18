@@ -222,20 +222,23 @@ export async function scrapeUrl(url: string): Promise<Listing> {
   try {
     const page = await ctx.newPage();
 
-    // Verify FB session is still valid
+    // Check session validity by navigating to marketplace (requires auth).
+    // Using /marketplace/ rather than / because the homepage shows a login
+    // form in the sidebar even when logged in, making it unreliable for detection.
     console.log("[scraper] Checking Facebook session validity...");
-    await page.goto("https://www.facebook.com/", {
+    await page.goto("https://www.facebook.com/marketplace/", {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });
     await page.waitForTimeout(2000);
 
-    const hasLoginForm = await page
-      .locator('input[name="email"]')
-      .isVisible()
-      .catch(() => false);
+    const currentUrl = page.url();
+    console.log(`[scraper] Session check URL: ${currentUrl}`);
 
-    if (hasLoginForm) {
+    // FB redirects to /login if the session is expired
+    const sessionExpired = currentUrl.includes("/login");
+
+    if (sessionExpired) {
       const email = process.env.FB_EMAIL;
       const password = process.env.FB_PASSWORD;
 
@@ -247,24 +250,28 @@ export async function scrapeUrl(url: string): Promise<Listing> {
         );
       }
 
-      console.log("[scraper] Session expired — attempting re-login with FB_EMAIL...");
+      console.log("[scraper] Session expired — navigating to /login for re-login...");
 
-      console.log(`[scraper] Pre-login URL: ${page.url()}`);
-      console.log(`[scraper] Pre-login title: ${await page.title()}`);
+      // Navigate explicitly to /login so waitForURL can detect the redirect away from it
+      await page.goto("https://www.facebook.com/login/", {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
+
+      console.log(`[scraper] Login page URL: ${page.url()}`);
 
       await page.fill('input[name="email"]', email);
       await page.fill('input[name="pass"]', password);
-      // Press Enter — more reliable than clicking the submit button (selector varies by FB version)
       await page.keyboard.press("Enter");
 
-      // Wait for FB to redirect away from the login page (up to 15s)
+      // Now waitForURL works correctly — we know we're on /login, wait to leave it
       try {
         await page.waitForURL(
           (u) => !u.pathname.startsWith("/login"),
           { timeout: 15000 }
         );
       } catch {
-        // URL didn't change — fall through to explicit login-form check below
+        // URL didn't change — fall through to check below
       }
 
       const postLoginUrl = page.url();
@@ -272,25 +279,17 @@ export async function scrapeUrl(url: string): Promise<Listing> {
       console.log(`[scraper] Post-login URL: ${postLoginUrl}`);
       console.log(`[scraper] Post-login title: ${postLoginTitle}`);
 
-      const loginFailed = await page
-        .locator('input[name="email"]')
-        .isVisible()
-        .catch(() => false);
-
-      console.log(`[scraper] Login form still visible: ${loginFailed}`);
-
-      // Log a snippet of the page HTML to help diagnose security challenges
       const bodySnippet = await page.evaluate(() =>
         document.body?.innerText?.slice(0, 500) ?? ""
       ).catch(() => "");
-      console.log(`[scraper] Page text snippet: ${bodySnippet}`);
+      console.log(`[scraper] Post-login page text: ${bodySnippet}`);
 
-      if (loginFailed) {
+      const stillOnLogin = postLoginUrl.includes("/login");
+      if (stillOnLogin) {
         throw new Error(
-          `[scraper] Facebook re-login failed — login form still visible after submit. ` +
-          `Post-login URL: ${postLoginUrl} | Title: "${postLoginTitle}". ` +
-          `Possible causes: wrong FB_EMAIL/FB_PASSWORD, account locked, or Facebook is ` +
-          `showing a security challenge. Check Railway deploy logs for page text snippet.`
+          `[scraper] Facebook re-login failed — still on login page after submit. ` +
+          `URL: ${postLoginUrl} | Title: "${postLoginTitle}". ` +
+          `Possible causes: wrong FB_EMAIL/FB_PASSWORD, account locked, or security challenge.`
         );
       }
 
