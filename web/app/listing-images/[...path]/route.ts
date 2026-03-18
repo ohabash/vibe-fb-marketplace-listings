@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 /**
  * Proxy handler for /listing-images/**
  *
