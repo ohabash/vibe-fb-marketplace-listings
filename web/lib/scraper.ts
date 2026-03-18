@@ -284,12 +284,20 @@ export async function scrapeUrl(url: string): Promise<Listing> {
       ).catch(() => "");
       console.log(`[scraper] Post-login page text: ${bodySnippet}`);
 
-      const stillOnLogin = postLoginUrl.includes("/login");
-      if (stillOnLogin) {
+      if (postLoginUrl.includes("two_step_verification")) {
+        throw new Error(
+          `[scraper] Facebook requires device verification (2FA/new location) — ` +
+          `cannot complete login from the Railway server automatically. ` +
+          `Run the session refresh script locally and push a new FB_SESSION_B64 to Firebase. ` +
+          `See docs/fb-session.md.`
+        );
+      }
+
+      if (postLoginUrl.includes("/login")) {
         throw new Error(
           `[scraper] Facebook re-login failed — still on login page after submit. ` +
           `URL: ${postLoginUrl} | Title: "${postLoginTitle}". ` +
-          `Possible causes: wrong FB_EMAIL/FB_PASSWORD, account locked, or security challenge.`
+          `Possible causes: wrong FB_EMAIL/FB_PASSWORD or account locked.`
         );
       }
 
@@ -326,6 +334,14 @@ export async function scrapeUrl(url: string): Promise<Listing> {
       } catch { /* fall through */ }
       const postUrl = page.url();
       console.log(`[scraper] Post-login URL: ${postUrl}`);
+      if (postUrl.includes("two_step_verification")) {
+        throw new Error(
+          `[scraper] Facebook requires device verification (2FA/new location) — ` +
+          `cannot complete login from the Railway server automatically. ` +
+          `Run the session refresh script locally and push a new session to Firebase. ` +
+          `See docs/fb-session.md.`
+        );
+      }
       if (postUrl.includes("/login")) {
         throw new Error(`[scraper] Re-login failed after listing redirect. URL: ${postUrl}`);
       }
