@@ -251,7 +251,8 @@ export async function scrapeUrl(url: string): Promise<Listing> {
 
       await page.fill('input[name="email"]', email);
       await page.fill('input[name="pass"]', password);
-      await page.click('button[name="login"]');
+      // Press Enter — more reliable than clicking the submit button (selector varies by FB version)
+      await page.keyboard.press("Enter");
 
       // Wait for FB to redirect away from the login page (up to 15s)
       try {
