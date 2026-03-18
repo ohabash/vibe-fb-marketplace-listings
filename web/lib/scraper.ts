@@ -303,6 +303,37 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     console.log(`[scraper] Navigating to listing: ${url}`);
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
+    // Individual listing pages can also redirect to /login even when /marketplace/ didn't.
+    // If that happens, trigger re-login and retry the listing navigation once.
+    if (page.url().includes("/login") && !loginJustPerformed) {
+      console.log(`[scraper] Listing page redirected to login — triggering re-login...`);
+      const email = process.env.FB_EMAIL;
+      const password = process.env.FB_PASSWORD;
+      if (!email || !password) {
+        throw new Error(
+          "[scraper] Facebook session expired (listing redirect) and FB_EMAIL/FB_PASSWORD are not set."
+        );
+      }
+      await page.goto("https://www.facebook.com/login/", {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
+      await page.fill('input[name="email"]', email);
+      await page.fill('input[name="pass"]', password);
+      await page.keyboard.press("Enter");
+      try {
+        await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 15000 });
+      } catch { /* fall through */ }
+      const postUrl = page.url();
+      console.log(`[scraper] Post-login URL: ${postUrl}`);
+      if (postUrl.includes("/login")) {
+        throw new Error(`[scraper] Re-login failed after listing redirect. URL: ${postUrl}`);
+      }
+      console.log("[scraper] Re-login successful — retrying listing navigation");
+      loginJustPerformed = true;
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    }
+
     let html = "";
     const start = Date.now();
     const deadline = start + 20000;
