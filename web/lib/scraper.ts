@@ -9,7 +9,7 @@
  */
 import "server-only";
 import { chromium } from "playwright";
-import type { Listing } from "@/types/listing";
+import type { Listing } from "@/types/listing.types";
 import { ensureSession, SESSION_DIR } from "./playwright-session";
 import { uploadToStorage } from "./firebase-storage";
 
@@ -102,6 +102,9 @@ function parseHTML(html: string): Partial<Listing> {
 
   const listingType = find1(/"__isMarketplace(\w+Listing)"/, chunk);
   const isShipping = /"is_shipping_offered":true/.test(chunk);
+  const status = /"is_sold":true/.test(chunk) ? "sold"
+    : /"is_pending":true/.test(chunk) ? "pending"
+    : "live";
   const postId = find1(/"post_id":"(\d+)"/, chunk);
 
   const sellerName = find1(/"actors":\[\{"__typename":"User","name":"([^"]+)"/, chunk);
@@ -154,6 +157,7 @@ function parseHTML(html: string): Partial<Listing> {
     posted_at: postedAt,
     listing_type: listingType ? `Marketplace${listingType}` : "",
     is_shipping_offered: isShipping,
+    status,
     post_id: postId,
     seller: {
       name: sellerName,
@@ -179,7 +183,10 @@ function parseHTML(html: string): Partial<Listing> {
  * NOTE: inferred fields are NOT preserved here — the caller (rescrape route)
  * reads the existing inferred data from Firebase and merges it.
  */
-export async function scrapeUrl(url: string): Promise<Listing> {
+export async function scrapeUrl(
+  url: string,
+  options?: { skipImageUpload?: boolean }
+): Promise<Listing> {
   console.log(`[scraper] Starting scrape: ${url}`);
   await ensureSession();
 
@@ -200,11 +207,16 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     posted_at: "",
     listing_type: "",
     is_shipping_offered: false,
+    status: "live",
     post_id: "",
     seller: { name: "", id: "", profile_url: "" },
     images: [],
     url: `https://www.facebook.com/marketplace/item/${id}/`,
-    inferred: { pet_friendly: "unknown", has_view: 1, neighborhood: 1 },
+    inferred: {
+      pet_friendly: "unknown", has_view: 1, neighborhood: 1,
+      pool: "unknown", gym: "unknown", parking: "unknown", elevator: "unknown",
+      wifi: "unknown", terrace: "unknown", jacuzzi: "unknown", security: "unknown",
+    },
   };
 
   // Strip FB_SESSION_B64 from the browser's env — it's ~5MB and causes E2BIG
@@ -232,9 +244,14 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     console.log(`[scraper] Session check URL: ${currentUrl}`);
 
     if (currentUrl.includes("/login")) {
+      console.error(
+        "[scraper] SESSION_EXPIRED: marketplace/ redirected to /login. " +
+        "This typically means the session was established on a different IP than Railway's. " +
+        "Fix: POST /api/fb-setup {\"start\":true} to re-login directly from Railway's IP."
+      );
       throw new Error(
         "[scraper] SESSION_EXPIRED: Facebook session is expired. " +
-        "Run `npx tsx scripts/push-session.ts` from your local machine to refresh it, then try again."
+        "Fix: POST /api/fb-setup {\"start\":true} from your terminal to re-login from Railway's IP."
       );
     }
 
@@ -245,9 +262,14 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
     if (page.url().includes("/login")) {
+      console.error(
+        "[scraper] SESSION_EXPIRED: listing URL redirected to /login. " +
+        "This confirms the session was rejected by FB — likely because it was created on a different IP than Railway's. " +
+        "Fix: POST /api/fb-setup {\"start\":true} to re-login directly from Railway's IP."
+      );
       throw new Error(
         "[scraper] SESSION_EXPIRED: Facebook session is expired (listing redirect). " +
-        "Run `npx tsx scripts/push-session.ts` from your local machine to refresh it, then try again."
+        "Fix: POST /api/fb-setup {\"start\":true} from your terminal to re-login from Railway's IP."
       );
     }
 
@@ -285,9 +307,12 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     await ctx.close();
   }
 
-  if (listing.images.length > 0) {
+  if (listing.images.length > 0 && !options?.skipImageUpload) {
     console.log(`[scraper] Uploading ${listing.images.length} images to Firebase Storage...`);
     listing.images = await uploadImages(listing.id, listing.images);
+  } else if (options?.skipImageUpload) {
+    console.log("[scraper] Skipping image upload (rescrape mode)");
+    listing.images = [];
   }
 
   console.log(`[scraper] Scrape complete: ${listing.id}`);

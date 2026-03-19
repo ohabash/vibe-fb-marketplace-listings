@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, RefreshCw, Trash2 } from "lucide-react";
-import type { Listing } from "@/types/listing";
+import type { Listing } from "@/types/listing.types";
 
 interface Props {
   listing: Listing;

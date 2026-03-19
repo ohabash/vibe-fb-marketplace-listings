@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   let listing;
   try {
-    listing = await scrapeUrl(url);
+    listing = await scrapeUrl(url, { skipImageUpload: true });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Scrape failed" },
@@ -31,11 +31,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Preserve inferred fields and dateAdded from any prior scrape
+  // Preserve images, inferred fields, and dateAdded from any prior scrape
   const existingSnap = await get(ref(db, `listings/${listing.id}`));
   if (existingSnap.exists()) {
     const existing = existingSnap.val();
     if (existing.inferred) listing.inferred = { ...listing.inferred, ...existing.inferred };
+    if (existing.images?.length) listing.images = existing.images;
     listing.dateAdded = existing.dateAdded ?? Date.now(); // backfill if missing
   } else {
     listing.dateAdded = Date.now();

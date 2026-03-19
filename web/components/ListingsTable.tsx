@@ -15,7 +15,7 @@ import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Plus, X, Loader2 } from
 import { IoLocationSharp } from "react-icons/io5";
 import { TbBuildingCommunity } from "react-icons/tb";
 import { MdOutlineLandscape } from "react-icons/md";
-import type { Listing } from "@/types/listing";
+import type { Listing } from "@/types/listing.types";
 import { ref, onValue } from "firebase/database";
 import { db } from "@/lib/firebase";
 import ListingModal from "./ListingModal";
@@ -42,16 +42,16 @@ function formatDate(iso: string) {
 }
 
 // Extract numeric bed count from unit_details
-function getBeds(unit_details: string[]): number | null {
-  const d = unit_details.find((s) => /bed/i.test(s));
+function getBeds(unit_details: string[] | undefined): number | null {
+  const d = (unit_details ?? []).find((s) => /bed/i.test(s));
   if (!d) return null;
   const m = d.match(/(\d+)\s*bed/i);
   return m ? parseInt(m[1]) : null;
 }
 
 // Extract numeric bath count from unit_details
-function getBaths(unit_details: string[]): number | null {
-  const d = unit_details.find((s) => /bath/i.test(s));
+function getBaths(unit_details: string[] | undefined): number | null {
+  const d = (unit_details ?? []).find((s) => /bath/i.test(s));
   if (!d) return null;
   const m = d.match(/(\d+)\s*bath/i);
   return m ? parseInt(m[1]) : null;
@@ -64,41 +64,45 @@ function scaleClass(v: number) {
   return "bg-green-50 text-green-600 border-green-200";
 }
 
-// Amenity flags
-function hasInUnitLaundry(unit_details: string[]) {
-  return unit_details.some((d) => /in.unit laundry/i.test(d));
-}
-function hasBuildingLaundry(unit_details: string[]) {
-  return unit_details.some((d) => /laundry in building/i.test(d));
-}
-function hasParking(unit_details: string[]) {
-  return unit_details.some((d) => /parking/i.test(d));
-}
+// Scraped amenities — derived from unit_details text
+const SCRAPED_AMENITIES: { label: string; emoji: string; check: (ud: string[]) => boolean }[] = [
+  { label: "In-unit Laundry", emoji: "🧺", check: (ud) => ud.some((d) => /in.unit laundry/i.test(d)) },
+  { label: "Building Laundry", emoji: "🏢", check: (ud) => ud.some((d) => /laundry in building/i.test(d)) },
+  { label: "Parking",         emoji: "🚗", check: (ud) => ud.some((d) => /parking/i.test(d)) },
+];
 
-function AmenityBadges({ unit_details }: { unit_details: string[] }) {
-  const inUnit = hasInUnitLaundry(unit_details);
-  const bldg = hasBuildingLaundry(unit_details);
-  const parking = hasParking(unit_details);
+// Inferred amenities — human-confirmed, shown in table only if true
+const INFERRED_AMENITIES: { key: keyof Listing["inferred"]; label: string; emoji: string }[] = [
+  { key: "parking",  label: "Parking",  emoji: "🚗" },
+  { key: "pool",     label: "Pool",     emoji: "🏊" },
+  { key: "gym",      label: "Gym",      emoji: "💪" },
+  { key: "elevator", label: "Elevator", emoji: "🛗" },
+  { key: "wifi",     label: "WiFi",     emoji: "📶" },
+  { key: "terrace",  label: "Terrace",  emoji: "🌿" },
+  { key: "jacuzzi",  label: "Jacuzzi",  emoji: "🛁" },
+  { key: "security", label: "Security", emoji: "🔒" },
+];
 
-  if (!inUnit && !bldg && !parking) return <span className="text-slate-300 text-xs">—</span>;
-
+function AmenityBadges({ listing }: { listing: Listing }) {
+  const all = [
+    ...SCRAPED_AMENITIES
+      .filter(({ check }) => check(listing.unit_details ?? []))
+      .map(({ label, emoji }) => ({ label, emoji })),
+    ...INFERRED_AMENITIES
+      .filter(({ key }) => listing.inferred?.[key] === true)
+      .map(({ label, emoji }) => ({ label, emoji })),
+  ];
+  // Deduplicate by label (e.g. parking can come from both sources)
+  const seen = new Set<string>();
+  const badges = all.filter(({ label }) => !seen.has(label) && seen.add(label));
+  if (badges.length === 0) return <span className="text-slate-300 text-xs">—</span>;
   return (
     <div className="flex gap-1 flex-wrap">
-      {inUnit && (
-        <span title="In-unit laundry" className="text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded px-1.5 py-0.5 whitespace-nowrap">
-          🧺 In-unit
+      {badges.map(({ label, emoji }) => (
+        <span key={label} className="text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 whitespace-nowrap">
+          {emoji} {label}
         </span>
-      )}
-      {bldg && (
-        <span title="Laundry in building" className="text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 whitespace-nowrap">
-          🏢 Laundry
-        </span>
-      )}
-      {parking && (
-        <span title="Parking" className="text-xs bg-amber-50 text-amber-700 border border-amber-100 rounded px-1.5 py-0.5 whitespace-nowrap">
-          🚗 Parking
-        </span>
-      )}
+      ))}
     </div>
   );
 }
@@ -150,12 +154,20 @@ export default function ListingsTable() {
       columnHelper.accessor("title", {
         header: "Listing",
         cell: (info) => {
-          const { notes, id } = info.row.original;
+          const { notes, id, status } = info.row.original;
           return (
             <div className="max-w-[220px]">
-              <span className="font-medium text-slate-900 line-clamp-2 block leading-snug">
-                {info.getValue()}
-              </span>
+              <div className="flex items-start gap-1.5 flex-wrap">
+                <span className="font-medium text-slate-900 line-clamp-2 block leading-snug">
+                  {info.getValue()}
+                </span>
+                {status === "sold" && (
+                  <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-400 rounded px-1.5 py-0.5 whitespace-nowrap leading-none self-center">Sold</span>
+                )}
+                {status === "pending" && (
+                  <span className="inline-block text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap leading-none self-center">Pending</span>
+                )}
+              </div>
               {notes && (
                 <span className="text-xs text-slate-400 line-clamp-1 mt-0.5 italic">
                   {notes}
@@ -186,7 +198,7 @@ export default function ListingsTable() {
           header: "Location",
           cell: (info) => {
             const { city, state, postal_code, coordinates } = info.row.original.location;
-            const { latitude, longitude } = coordinates;
+            const { latitude, longitude } = coordinates ?? {};
             const mapsUrl = latitude != null && longitude != null
               ? `https://www.google.com/maps?q=${latitude},${longitude}`
               : null;
@@ -249,7 +261,7 @@ export default function ListingsTable() {
         id: "amenities",
         header: "Amenities",
         enableSorting: false,
-        cell: (info) => <AmenityBadges unit_details={info.row.original.unit_details} />,
+        cell: (info) => <AmenityBadges listing={info.row.original} />,
       }),
 
       // Pet friendly (sortable: false=0, unknown=1, true=2)
@@ -295,20 +307,22 @@ export default function ListingsTable() {
         ),
       }),
 
-      // Actions
-      columnHelper.display({
-        id: "actions",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-          <ActionMenu
-            listing={info.row.original}
-            onRescrapeComplete={handleRescrapeComplete}
-            onDeleteComplete={handleDeleteComplete}
-            variant="row"
-          />
-        ),
-      }),
+      // Actions (dev only)
+      ...(process.env.NODE_ENV === "development" ? [
+        columnHelper.display({
+          id: "actions",
+          header: "",
+          enableSorting: false,
+          cell: (info) => (
+            <ActionMenu
+              listing={info.row.original}
+              onRescrapeComplete={handleRescrapeComplete}
+              onDeleteComplete={handleDeleteComplete}
+              variant="row"
+            />
+          ),
+        }),
+      ] : []),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -418,22 +432,24 @@ export default function ListingsTable() {
               className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-colors"
             />
           </div>
-          <button
-            onClick={() => {
-              setAddOpen((o) => !o);
-              setAddState("idle");
-              setAddError("");
-              setTimeout(() => addInputRef.current?.focus(), 50);
-            }}
-            className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 transition-colors shadow-sm shrink-0"
-          >
-            {addOpen ? <X size={15} /> : <Plus size={15} />}
-            {addOpen ? "Cancel" : "Add listing"}
-          </button>
+          {process.env.NODE_ENV === "development" && (
+            <button
+              onClick={() => {
+                setAddOpen((o) => !o);
+                setAddState("idle");
+                setAddError("");
+                setTimeout(() => addInputRef.current?.focus(), 50);
+              }}
+              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 transition-colors shadow-sm shrink-0"
+            >
+              {addOpen ? <X size={15} /> : <Plus size={15} />}
+              {addOpen ? "Cancel" : "Add listing"}
+            </button>
+          )}
         </div>
 
         {/* Add listing form */}
-        {addOpen && (
+        {process.env.NODE_ENV === "development" && addOpen && (
           <div className="flex items-start gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex-1">
               <input

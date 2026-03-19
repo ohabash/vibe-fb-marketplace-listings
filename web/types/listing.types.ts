@@ -17,6 +17,7 @@ export interface Listing {
   posted_at: string;
   listing_type: string;
   is_shipping_offered: boolean;
+  status: "live" | "sold" | "pending";
   post_id: string;
   seller: { name: string; id: string; profile_url: string };
   images: string[];
@@ -27,5 +28,13 @@ export interface Listing {
     pet_friendly: "unknown" | boolean;
     has_view: 1 | 2 | 3;
     neighborhood: 1 | 2 | 3;
+    pool: "unknown" | boolean; // display as amenity
+    gym: "unknown" | boolean; // display as amenity
+    parking: "unknown" | boolean; // display as amenity
+    elevator: "unknown" | boolean; // display as amenity
+    wifi: "unknown" | boolean; // display as amenity
+    terrace: "unknown" | boolean; // display as amenity
+    jacuzzi: "unknown" | boolean; // display as amenity
+    security: "unknown" | boolean; // display as amenity
   };
 }

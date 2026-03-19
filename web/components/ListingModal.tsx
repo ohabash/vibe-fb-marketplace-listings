@@ -15,8 +15,19 @@ import {
   Package,
 } from "lucide-react";
 import { IoLocationSharp } from "react-icons/io5";
-import type { Listing } from "@/types/listing";
+import type { Listing } from "@/types/listing.types";
 import ActionMenu from "./ActionMenu";
+
+const AMENITY_TOGGLES: { key: keyof Listing["inferred"]; label: string; emoji: string }[] = [
+  { key: "parking",  label: "Parking",  emoji: "🚗" },
+  { key: "pool",     label: "Pool",     emoji: "🏊" },
+  { key: "gym",      label: "Gym",      emoji: "💪" },
+  { key: "elevator", label: "Elevator", emoji: "🛗" },
+  { key: "wifi",     label: "WiFi",     emoji: "📶" },
+  { key: "terrace",  label: "Terrace",  emoji: "🌿" },
+  { key: "jacuzzi",  label: "Jacuzzi",  emoji: "🛁" },
+  { key: "security", label: "Security", emoji: "🔒" },
+];
 
 interface Props {
   listing: Listing;
@@ -46,7 +57,19 @@ export default function ListingModal({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
-  const defaultInferred = { pet_friendly: "unknown" as const, has_view: 1 as const, neighborhood: 1 as const };
+  const defaultInferred = {
+    pet_friendly: "unknown" as const,
+    has_view: 1 as const,
+    neighborhood: 1 as const,
+    pool: "unknown" as const,
+    gym: "unknown" as const,
+    parking: "unknown" as const,
+    elevator: "unknown" as const,
+    wifi: "unknown" as const,
+    terrace: "unknown" as const,
+    jacuzzi: "unknown" as const,
+    security: "unknown" as const,
+  };
   const [inferred, setInferred] = useState(current.inferred ?? defaultInferred);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -346,6 +369,19 @@ export default function ListingModal({
                 activeClass={(v) => v === 3 ? "bg-emerald-500 text-white" : v === 2 ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-700"}
                 onChange={(v) => handleInferredChange({ neighborhood: v })}
               />
+            </div>
+            <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-slate-100">
+              {AMENITY_TOGGLES.map(({ key, label, emoji }) => (
+                <InferredToggle
+                  key={key}
+                  label={label}
+                  emoji={emoji}
+                  options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
+                  value={(inferred[key] ?? "unknown") as "unknown" | boolean}
+                  activeClass={(v) => v === true ? "bg-emerald-500 text-white" : v === false ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700"}
+                  onChange={(v) => handleInferredChange({ [key]: v })}
+                />
+              ))}
             </div>
           </div>
 
