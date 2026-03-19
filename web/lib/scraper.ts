@@ -10,7 +10,7 @@
 import "server-only";
 import { chromium } from "playwright";
 import type { Listing } from "@/types/listing";
-import { ensureSession, saveSessionToFirebase, SESSION_DIR } from "./playwright-session";
+import { ensureSession, SESSION_DIR } from "./playwright-session";
 import { uploadToStorage } from "./firebase-storage";
 
 // ---------------------------------------------------------------------------
@@ -209,22 +209,18 @@ export async function scrapeUrl(url: string): Promise<Listing> {
 
   // Strip FB_SESSION_B64 from the browser's env — it's ~5MB and causes E2BIG
   // when Playwright passes process.env to the Chromium child process.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { FB_SESSION_B64: _stripped, ...browserEnv } = process.env;
+  const { FB_SESSION_B64: _s, ...browserEnv } = process.env;
+  void _s;
   const ctx = await chromium.launchPersistentContext(SESSION_DIR, {
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
     env: browserEnv as Record<string, string>,
   });
 
-  let loginJustPerformed = false;
-
   try {
     const page = await ctx.newPage();
 
-    // Check session validity by navigating to marketplace (requires auth).
-    // Using /marketplace/ rather than / because the homepage shows a login
-    // form in the sidebar even when logged in, making it unreliable for detection.
+    // Check session validity — FB redirects to /login when session is expired
     console.log("[scraper] Checking Facebook session validity...");
     await page.goto("https://www.facebook.com/marketplace/", {
       waitUntil: "domcontentloaded",
@@ -235,119 +231,24 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     const currentUrl = page.url();
     console.log(`[scraper] Session check URL: ${currentUrl}`);
 
-    // FB redirects to /login if the session is expired
-    const sessionExpired = currentUrl.includes("/login");
-
-    if (sessionExpired) {
-      const email = process.env.FB_EMAIL;
-      const password = process.env.FB_PASSWORD;
-
-      if (!email || !password) {
-        throw new Error(
-          "[scraper] Facebook session expired and FB_EMAIL/FB_PASSWORD are not set — " +
-          "cannot auto re-login. Set these env vars in your environment or re-encode " +
-          "the session manually. See docs/fb-session.md."
-        );
-      }
-
-      console.log("[scraper] Session expired — navigating to /login for re-login...");
-
-      // Navigate explicitly to /login so waitForURL can detect the redirect away from it
-      await page.goto("https://www.facebook.com/login/", {
-        waitUntil: "domcontentloaded",
-        timeout: 30000,
-      });
-
-      console.log(`[scraper] Login page URL: ${page.url()}`);
-
-      await page.fill('input[name="email"]', email);
-      await page.fill('input[name="pass"]', password);
-      await page.keyboard.press("Enter");
-
-      // Now waitForURL works correctly — we know we're on /login, wait to leave it
-      try {
-        await page.waitForURL(
-          (u) => !u.pathname.startsWith("/login"),
-          { timeout: 15000 }
-        );
-      } catch {
-        // URL didn't change — fall through to check below
-      }
-
-      const postLoginUrl = page.url();
-      const postLoginTitle = await page.title();
-      console.log(`[scraper] Post-login URL: ${postLoginUrl}`);
-      console.log(`[scraper] Post-login title: ${postLoginTitle}`);
-
-      const bodySnippet = await page.evaluate(() =>
-        document.body?.innerText?.slice(0, 500) ?? ""
-      ).catch(() => "");
-      console.log(`[scraper] Post-login page text: ${bodySnippet}`);
-
-      if (postLoginUrl.includes("two_step_verification")) {
-        throw new Error(
-          `[scraper] Facebook requires device verification (2FA/new location) — ` +
-          `cannot complete login from the Railway server automatically. ` +
-          `Run the session refresh script locally and push a new FB_SESSION_B64 to Firebase. ` +
-          `See docs/fb-session.md.`
-        );
-      }
-
-      if (postLoginUrl.includes("/login")) {
-        throw new Error(
-          `[scraper] Facebook re-login failed — still on login page after submit. ` +
-          `URL: ${postLoginUrl} | Title: "${postLoginTitle}". ` +
-          `Possible causes: wrong FB_EMAIL/FB_PASSWORD or account locked.`
-        );
-      }
-
-      console.log("[scraper] Re-login successful");
-      loginJustPerformed = true;
-    } else {
-      console.log("[scraper] Session valid — proceeding to listing");
+    if (currentUrl.includes("/login")) {
+      throw new Error(
+        "[scraper] SESSION_EXPIRED: Facebook session is expired. " +
+        "Run `npx tsx scripts/push-session.ts` from your local machine to refresh it, then try again."
+      );
     }
+
+    console.log("[scraper] Session valid — proceeding to listing");
 
     // Navigate to the listing and wait for data to appear
     console.log(`[scraper] Navigating to listing: ${url}`);
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-    // Individual listing pages can also redirect to /login even when /marketplace/ didn't.
-    // If that happens, trigger re-login and retry the listing navigation once.
-    if (page.url().includes("/login") && !loginJustPerformed) {
-      console.log(`[scraper] Listing page redirected to login — triggering re-login...`);
-      const email = process.env.FB_EMAIL;
-      const password = process.env.FB_PASSWORD;
-      if (!email || !password) {
-        throw new Error(
-          "[scraper] Facebook session expired (listing redirect) and FB_EMAIL/FB_PASSWORD are not set."
-        );
-      }
-      await page.goto("https://www.facebook.com/login/", {
-        waitUntil: "domcontentloaded",
-        timeout: 30000,
-      });
-      await page.fill('input[name="email"]', email);
-      await page.fill('input[name="pass"]', password);
-      await page.keyboard.press("Enter");
-      try {
-        await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 15000 });
-      } catch { /* fall through */ }
-      const postUrl = page.url();
-      console.log(`[scraper] Post-login URL: ${postUrl}`);
-      if (postUrl.includes("two_step_verification")) {
-        throw new Error(
-          `[scraper] Facebook requires device verification (2FA/new location) — ` +
-          `cannot complete login from the Railway server automatically. ` +
-          `Run the session refresh script locally and push a new session to Firebase. ` +
-          `See docs/fb-session.md.`
-        );
-      }
-      if (postUrl.includes("/login")) {
-        throw new Error(`[scraper] Re-login failed after listing redirect. URL: ${postUrl}`);
-      }
-      console.log("[scraper] Re-login successful — retrying listing navigation");
-      loginJustPerformed = true;
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    if (page.url().includes("/login")) {
+      throw new Error(
+        "[scraper] SESSION_EXPIRED: Facebook session is expired (listing redirect). " +
+        "Run `npx tsx scripts/push-session.ts` from your local machine to refresh it, then try again."
+      );
     }
 
     let html = "";
@@ -382,22 +283,6 @@ export async function scrapeUrl(url: string): Promise<Listing> {
     }
   } finally {
     await ctx.close();
-  }
-
-  // Save refreshed session to Firebase after browser is fully closed
-  if (loginJustPerformed) {
-    try {
-      await saveSessionToFirebase();
-      console.log("[scraper] Session saved to Firebase — will survive container restart");
-    } catch (err) {
-      // Non-fatal — scrape already succeeded, just log the failure
-      console.error(
-        "[scraper] Warning: re-login succeeded but failed to save session to Firebase:", err
-      );
-      console.error(
-        "[scraper] The session is valid for this process lifetime but will NOT survive a restart."
-      );
-    }
   }
 
   if (listing.images.length > 0) {
