@@ -97,6 +97,18 @@ export default function ListingModal({
   const [inferred, setInferred] = useState(current.inferred ?? defaultInferred);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sync modal state when the parent selects a different listing externally
+  // (e.g. via the keyboard index shortcut while the modal is already open)
+  useEffect(() => {
+    setCurrent(listing);
+    setNotes(listing.notes ?? "");
+    setInferred(listing.inferred ?? defaultInferred);
+    setDescExpanded(false);
+    setCarouselIndex(0);
+    setTimeout(() => emblaApi?.scrollTo(0, true), 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing.id]);
+
   // Keyboard nav
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -160,6 +172,7 @@ export default function ListingModal({
 
   const formatPrice = (l: Listing) => {
     if (!l.price) return "—";
+    if (l.price.text) return l.price.text;
     if (l.price.amount == null) return "—";
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
@@ -322,7 +335,7 @@ export default function ListingModal({
 
   // Shared sticky top bar
   const topBar = (
-    <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-4 py-2.5 flex items-center justify-between shrink-0">
+    <div className="sticky1 top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-4 py-2.5 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-1">
         {allListings.length > 1 && (
           <>

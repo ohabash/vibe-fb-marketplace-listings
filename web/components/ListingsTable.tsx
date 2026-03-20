@@ -15,6 +15,7 @@ import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Plus, X, Loader2 } from
 import { IoLocationSharp } from "react-icons/io5";
 import { TbBuildingCommunity } from "react-icons/tb";
 import { MdOutlineLandscape } from "react-icons/md";
+import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
 import type { Listing } from "@/types/listing.types";
 import { ref, onValue } from "firebase/database";
 import { db } from "@/lib/firebase";
@@ -23,6 +24,7 @@ import ActionMenu from "./ActionMenu";
 import NotesPopover from "./NotesPopover";
 import HeartButton from "./HeartButton";
 import FbReloginButton from "./FbReloginButton";
+import { Tip, TooltipProvider } from "./Tooltip";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -37,8 +39,6 @@ function formatPrice(listing: Listing) {
   }).format(listing.price.amount);
 }
 
-
-// Extract numeric bed count from unit_details
 function getBeds(unit_details: string[] | undefined): number | null {
   const d = (unit_details ?? []).find((s) => /bed/i.test(s));
   if (!d) return null;
@@ -46,7 +46,6 @@ function getBeds(unit_details: string[] | undefined): number | null {
   return m ? parseInt(m[1]) : null;
 }
 
-// Extract numeric bath count from unit_details
 function getBaths(unit_details: string[] | undefined): number | null {
   const d = (unit_details ?? []).find((s) => /bath/i.test(s));
   if (!d) return null;
@@ -54,21 +53,18 @@ function getBaths(unit_details: string[] | undefined): number | null {
   return m ? parseInt(m[1]) : null;
 }
 
-// Color classes for 1-3 scale fields (has_view, neighborhood, etc.)
 function scaleClass(v: number) {
-  if (v === 3) return "bg-blue-50 text-blue-700 border-blue-200";
-  if (v === 2) return "bg-green-100 text-green-800 border-green-300";
-  return "bg-green-50 text-green-600 border-green-200";
+  if (v === 3) return "bg-blue-50 text-blue-600 border-blue-200";
+  if (v === 2) return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  return "bg-slate-50 text-slate-500 border-slate-200";
 }
 
-// Scraped amenities — derived from unit_details text
 const SCRAPED_AMENITIES: { label: string; emoji: string; check: (ud: string[]) => boolean }[] = [
   { label: "In-unit Laundry", emoji: "🧺", check: (ud) => ud.some((d) => /in.unit laundry/i.test(d)) },
   { label: "Building Laundry", emoji: "🏢", check: (ud) => ud.some((d) => /laundry in building/i.test(d)) },
   { label: "Parking",         emoji: "🚗", check: (ud) => ud.some((d) => /parking/i.test(d)) },
 ];
 
-// Inferred amenities — human-confirmed, shown in table only if true
 const INFERRED_AMENITIES: { key: keyof Listing["inferred"]; label: string; emoji: string }[] = [
   { key: "parking",  label: "Parking",  emoji: "🚗" },
   { key: "pool",     label: "Pool",     emoji: "🏊" },
@@ -93,15 +89,18 @@ function AmenityBadges({ listing }: { listing: Listing }) {
       .filter(({ key }) => listing.inferred?.[key] === true)
       .map(({ label, emoji }) => ({ label, emoji })),
   ];
-  // Deduplicate by label (e.g. parking can come from both sources)
   const seen = new Set<string>();
   const badges = all.filter(({ label }) => !seen.has(label) && seen.add(label));
   if (badges.length === 0) return <span className="text-slate-300 text-xs">—</span>;
   return (
     <div className="flex gap-1 flex-wrap">
       {badges.map(({ label, emoji }) => (
-        <span key={label} className="text-xs bg-slate-50 text-slate-600 border border-slate-200 rounded px-1.5 py-0.5 whitespace-nowrap">
-          {emoji} {label}
+        <span
+          key={label}
+          className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+        >
+          <span className="text-xs leading-none">{emoji}</span>
+          {label}
         </span>
       ))}
     </div>
@@ -115,23 +114,23 @@ export default function ListingsTable() {
     const listingsRef = ref(db, "listings");
     const unsubscribe = onValue(listingsRef, (snapshot) => {
       const val = snapshot.val() as Record<string, Listing> | null;
-      // Sort newest-first by default; listings without dateAdded fall to the bottom
       const rows = val ? Object.values(val) : [];
       rows.sort((a, b) => (b.dateAdded ?? 0) - (a.dateAdded ?? 0));
       setListings(rows);
     });
     return unsubscribe;
   }, []);
+
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
-  // Add listing
   const [addUrl, setAddUrl] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [addState, setAddState] = useState<"idle" | "scraping" | "error">("idle");
   const [addError, setAddError] = useState("");
   const addInputRef = useRef<HTMLInputElement>(null);
+
   const indexBufferRef = useRef<string>("");
   const indexTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -188,217 +187,237 @@ export default function ListingsTable() {
   }, []);
 
   const columns = useMemo(() => [
-      // Row index
-      columnHelper.display({
-        id: "index",
-        header: "#",
-        enableSorting: false,
-        cell: (info) => (
-          <span className="text-xs text-slate-400 tabular-nums">{info.row.index + 1}</span>
-        ),
-      }),
-
-      // Thumbnail
-      columnHelper.accessor("images", {
-        header: "",
-        enableSorting: false,
-        cell: (info) => {
-          const imgs = info.getValue() ?? [];
-          return imgs[0] ? (
-            <div className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-slate-100">
-              <Image src={imgs[0]} alt="thumbnail" fill className="object-cover" sizes="56px" />
-            </div>
-          ) : (
-            <div className="w-14 h-14 rounded-lg bg-slate-100 shrink-0" />
-          );
-        },
-      }),
-
-      // Title + notes preview
-      columnHelper.accessor("title", {
-        header: "Listing",
-        cell: (info) => {
-          const { id, status } = info.row.original;
-          return (
-            <div className="max-w-[220px]">
-              <div className="flex items-start gap-1.5 flex-wrap">
-                <span className="font-medium text-slate-900 line-clamp-2 block leading-snug">
-                  {info.getValue()}
-                </span>
-                {status === "sold" && (
-                  <span className="inline-block text-[10px] font-semibold bg-slate-100 text-slate-400 rounded px-1.5 py-0.5 whitespace-nowrap leading-none self-center">Sold</span>
-                )}
-                {status === "pending" && (
-                  <span className="inline-block text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap leading-none self-center">Pending</span>
-                )}
-              </div>
-
-              <span className="text-[10px] text-slate-300 font-mono mt-0.5 block">{id}</span>
-            </div>
-          );
-        },
-      }),
-
-      // Notes popover
-      columnHelper.display({
-        id: "notes_popover",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-          <NotesPopover
-            listing={info.row.original}
-            onSave={handleNotesChange}
-          />
-        ),
-      }),
-
-      // Price
-      columnHelper.accessor((row) => row.price?.amount ?? null, {
-        id: "price",
-        header: "Price/mo",
-        cell: (info) => (
-          <span className="font-bold text-emerald-700 whitespace-nowrap text-sm">
-            {formatPrice(info.row.original)}
-          </span>
-        ),
-      }),
-
-      // Location: city + postal code
-      columnHelper.accessor(
-        (row) => `${row.location?.city ?? ""} ${row.location?.postal_code ?? ""}`.trim(),
-        {
-          id: "location",
-          header: "Location",
-          cell: (info) => {
-            const { city, state, postal_code, coordinates } = info.row.original.location ?? {};
-            const { latitude, longitude } = coordinates ?? {};
-            const mapsUrl = latitude != null && longitude != null
-              ? `https://www.google.com/maps?q=${latitude},${longitude}`
-              : null;
-            const inner = (
-              <div className="whitespace-nowrap">
-                <span className={mapsUrl ? "text-blue-600" : "text-slate-700"}>
-                  {[city, state].filter(Boolean).join(", ")}
-                </span>
-                {postal_code && (
-                  <span className="block text-xs text-slate-400">{postal_code}</span>
-                )}
-              </div>
-            );
-            return mapsUrl ? (
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-1 hover:underline group"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <IoLocationSharp size={14} className="text-red-400 group-hover:text-red-500 mt-0.5 shrink-0" />
-                {inner}
-              </a>
-            ) : inner;
-          },
-        }
+    // Row index
+    columnHelper.display({
+      id: "index",
+      header: "#",
+      enableSorting: false,
+      cell: (info) => (
+        <span className="text-[11px] text-slate-300 tabular-nums font-medium">{info.row.index + 1}</span>
       ),
+    }),
 
-      // Beds (sortable number)
-      columnHelper.accessor((row) => getBeds(row.unit_details) ?? -1, {
-        id: "beds",
-        header: "Beds",
-        cell: (info) => {
-          const v = getBeds(info.row.original.unit_details);
-          return (
-            <span className="text-slate-700 font-medium whitespace-nowrap">
-              {v != null ? `${v} bd` : "—"}
-            </span>
-          );
-        },
-      }),
+    // Thumbnail
+    columnHelper.accessor("images", {
+      header: "",
+      enableSorting: false,
+      cell: (info) => {
+        const imgs = info.getValue() ?? [];
+        if (!imgs[0]) return <div className="w-14 h-14 rounded-xl bg-slate-100 shrink-0 ring-1 ring-black/5" />;
+        return (
+          <HoverCardPrimitive.Root openDelay={150} closeDelay={100}>
+            <HoverCardPrimitive.Trigger asChild>
+              <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 ring-1 ring-black/5 cursor-zoom-in">
+                <Image src={imgs[0]} alt="thumbnail" fill className="object-cover" sizes="56px" />
+              </div>
+            </HoverCardPrimitive.Trigger>
+            <HoverCardPrimitive.Portal>
+              <HoverCardPrimitive.Content
+                side="right"
+                sideOffset={10}
+                align="center"
+                className="z-50 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+              >
+                <div className="relative w-64 h-64">
+                  <Image src={imgs[0]} alt="preview" fill className="object-cover" sizes="256px" />
+                </div>
+              </HoverCardPrimitive.Content>
+            </HoverCardPrimitive.Portal>
+          </HoverCardPrimitive.Root>
+        );
+      },
+    }),
 
-      // Baths (sortable number)
-      columnHelper.accessor((row) => getBaths(row.unit_details) ?? -1, {
-        id: "baths",
-        header: "Baths",
-        cell: (info) => {
-          const v = getBaths(info.row.original.unit_details);
-          return (
-            <span className="text-slate-700 font-medium whitespace-nowrap">
-              {v != null ? `${v} ba` : "—"}
-            </span>
-          );
-        },
-      }),
-
-      // Amenities
-      columnHelper.display({
-        id: "amenities",
-        header: "Amenities",
-        enableSorting: false,
-        cell: (info) => <AmenityBadges listing={info.row.original} />,
-      }),
-
-      // Pet friendly (sortable: false=0, unknown=1, true=2)
-      columnHelper.accessor((row) => {
-        const v = row.inferred?.pet_friendly;
-        return v === true ? 2 : v === false ? 0 : 1;
-      }, {
-        id: "pet_friendly",
-        header: "Pets",
-        cell: (info) => {
-          const v = info.row.original.inferred?.pet_friendly;
-          if (v === true) return <span className="text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 rounded px-1.5 py-0.5 whitespace-nowrap">🐾 Yes</span>;
-          if (v === false) return <span className="text-xs font-medium bg-red-50 text-red-600 border border-red-100 rounded px-1.5 py-0.5 whitespace-nowrap">🚫 No</span>;
-          return <span className="text-slate-300 text-xs whitespace-nowrap">?</span>;
-        },
-      }),
-
-      // Has view (sortable 1-3)
-      columnHelper.accessor((row) => row.inferred?.has_view ?? 1, {
-        id: "has_view",
-        header: "View",
-        cell: (info) => {
-          const v = info.row.original.inferred?.has_view ?? 1;
-          return <span className={`inline-flex items-center gap-1 text-xs font-medium border rounded px-1.5 py-0.5 whitespace-nowrap ${scaleClass(v)}`}><MdOutlineLandscape size={13} /> {v}</span>;
-        },
-      }),
-
-      // Neighborhood (sortable 1-3)
-      columnHelper.accessor((row) => row.inferred?.neighborhood ?? 1, {
-        id: "neighborhood",
-        header: "Area",
-        cell: (info) => {
-          const v = info.row.original.inferred?.neighborhood ?? 1;
-          return <span className={`inline-flex items-center gap-1 text-xs font-medium border rounded px-1.5 py-0.5 whitespace-nowrap ${scaleClass(v)}`}><TbBuildingCommunity size={12} /> {v}</span>;
-        },
-      }),
-
-      // Hearts
-      columnHelper.display({
-        id: "heart",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-          <div className="flex items-center">
-            <HeartButton listing={info.row.original} onChange={handleHeartChange} />
-            <HeartButton listing={info.row.original} onChange={handleHeart2Change} field="hearted2" />
+    // Title
+    columnHelper.accessor("title", {
+      header: "Listing",
+      cell: (info) => {
+        const { id, status } = info.row.original;
+        return (
+          <div className="min-w-[140px] max-w-[200px]">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-[13px] text-slate-800 line-clamp-1 leading-tight">
+                {info.getValue()}
+              </span>
+              {status === "sold" && (
+                <span className="shrink-0 text-[9px] font-bold tracking-wide uppercase bg-slate-100 text-slate-400 rounded-full px-1.5 py-0.5">Sold</span>
+              )}
+              {status === "pending" && (
+                <span className="shrink-0 text-[9px] font-bold tracking-wide uppercase bg-amber-50 text-amber-500 border border-amber-200 rounded-full px-1.5 py-0.5">Pending</span>
+              )}
+            </div>
+            <span className="text-[9px] text-slate-300 font-mono mt-0.5 block">{id}</span>
           </div>
-        ),
-      }),
+        );
+      },
+    }),
 
-      // Actions
-      columnHelper.display({
-        id: "actions",
-        header: "",
-        enableSorting: false,
-        cell: (info) => (
-          <ActionMenu
-            listing={info.row.original}
-            onRescrapeComplete={handleRescrapeComplete}
-            onDeleteComplete={handleDeleteComplete}
-            variant="row"
-          />
-        ),
-      }),
+    // Notes popover
+    columnHelper.display({
+      id: "notes_popover",
+      header: "",
+      enableSorting: false,
+      cell: (info) => (
+        <NotesPopover listing={info.row.original} onSave={handleNotesChange} />
+      ),
+    }),
+
+    // Price
+    columnHelper.accessor((row) => row.price?.amount ?? null, {
+      id: "price",
+      header: "Price",
+      cell: (info) => (
+        <span className="font-bold text-emerald-600 whitespace-nowrap text-[13px] tabular-nums">
+          {formatPrice(info.row.original)}
+        </span>
+      ),
+    }),
+
+    // Location
+    columnHelper.accessor(
+      (row) => `${row.location?.city ?? ""} ${row.location?.postal_code ?? ""}`.trim(),
+      {
+        id: "location",
+        header: "Location",
+        cell: (info) => {
+          const { city, state, postal_code, coordinates } = info.row.original.location ?? {};
+          const { latitude, longitude } = coordinates ?? {};
+          const mapsUrl = latitude != null && longitude != null
+            ? `https://www.google.com/maps?q=${latitude},${longitude}`
+            : null;
+          const label = [city, state].filter(Boolean).join(", ");
+          const inner = (
+            <div className="whitespace-nowrap">
+              <span className={`text-[12px] font-medium ${mapsUrl ? "text-blue-600" : "text-slate-700"}`}>
+                {label || "—"}
+              </span>
+              {postal_code && (
+                <span className="block text-[10px] text-slate-400 leading-tight">{postal_code}</span>
+              )}
+            </div>
+          );
+          return mapsUrl ? (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-1 hover:underline group"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IoLocationSharp size={12} className="text-red-400 group-hover:text-red-500 mt-0.5 shrink-0" />
+              {inner}
+            </a>
+          ) : inner;
+        },
+      }
+    ),
+
+    // Size (beds + baths merged)
+    columnHelper.accessor((row) => {
+      const beds = getBeds(row.unit_details) ?? -1;
+      const baths = getBaths(row.unit_details) ?? -1;
+      return beds * 100 + baths;
+    }, {
+      id: "size",
+      header: "Size",
+      cell: (info) => {
+        const beds = getBeds(info.row.original.unit_details);
+        const baths = getBaths(info.row.original.unit_details);
+        if (beds == null && baths == null) return <span className="text-slate-300 text-xs">—</span>;
+        return (
+          <span className="text-[12px] text-slate-700 font-medium whitespace-nowrap tabular-nums">
+            {beds != null ? `${beds}bd` : ""}
+            {beds != null && baths != null ? <span className="text-slate-300 mx-0.5">·</span> : null}
+            {baths != null ? `${baths}ba` : ""}
+          </span>
+        );
+      },
+    }),
+
+    // Amenities (emoji-only)
+    columnHelper.display({
+      id: "amenities",
+      header: "Amenities",
+      enableSorting: false,
+      cell: (info) => <AmenityBadges listing={info.row.original} />,
+    }),
+
+    // Pets
+    columnHelper.accessor((row) => {
+      const v = row.inferred?.pet_friendly;
+      return v === true ? 2 : v === false ? 0 : 1;
+    }, {
+      id: "pet_friendly",
+      header: "Pets",
+      cell: (info) => {
+        const v = info.row.original.inferred?.pet_friendly;
+        if (v === true) return <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">🐾 Yes</span>;
+        if (v === false) return <span className="text-[11px] font-semibold bg-red-50 text-red-500 border border-red-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">No</span>;
+        return <span className="text-slate-300 text-xs">?</span>;
+      },
+    }),
+
+    // View (1-3)
+    columnHelper.accessor((row) => row.inferred?.has_view ?? 1, {
+      id: "has_view",
+      header: "View",
+      cell: (info) => {
+        const v = info.row.original.inferred?.has_view ?? 1;
+        const label = v === 3 ? "Great view" : v === 2 ? "Decent view" : "No notable view";
+        return (
+          <Tip content={label} side="top">
+            <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold border rounded-full px-1.5 py-0.5 whitespace-nowrap cursor-default ${scaleClass(v)}`}>
+              <MdOutlineLandscape size={11} /> {v}
+            </span>
+          </Tip>
+        );
+      },
+    }),
+
+    // Neighborhood (1-3)
+    columnHelper.accessor((row) => row.inferred?.neighborhood ?? 1, {
+      id: "neighborhood",
+      header: "Area",
+      cell: (info) => {
+        const v = info.row.original.inferred?.neighborhood ?? 1;
+        const label = v === 3 ? "Great neighborhood" : v === 2 ? "Decent neighborhood" : "Basic neighborhood";
+        return (
+          <Tip content={label} side="top">
+            <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold border rounded-full px-1.5 py-0.5 whitespace-nowrap cursor-default ${scaleClass(v)}`}>
+              <TbBuildingCommunity size={11} /> {v}
+            </span>
+          </Tip>
+        );
+      },
+    }),
+
+    // Hearts
+    columnHelper.display({
+      id: "heart",
+      header: "",
+      enableSorting: false,
+      cell: (info) => (
+        <div className="flex items-center gap-0.5">
+          <HeartButton listing={info.row.original} onChange={handleHeartChange} />
+          <HeartButton listing={info.row.original} onChange={handleHeart2Change} field="hearted2" />
+        </div>
+      ),
+    }),
+
+    // Actions
+    columnHelper.display({
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      cell: (info) => (
+        <ActionMenu
+          listing={info.row.original}
+          onRescrapeComplete={handleRescrapeComplete}
+          onDeleteComplete={handleDeleteComplete}
+          variant="row"
+        />
+      ),
+    }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [handleNotesChange, handleHeartChange, handleHeart2Change, handleRescrapeComplete, handleDeleteComplete]);
 
@@ -413,7 +432,6 @@ export default function ListingsTable() {
     getFilteredRowModel: getFilteredRowModel(),
     globalFilterFn: (row, columnId, filterValue) => {
       const search = String(filterValue).toLowerCase();
-      // Always search the listing id regardless of visible columns
       if (row.original.id.includes(search)) return true;
       const cell = row.getValue<unknown>(columnId);
       return String(cell ?? "").toLowerCase().includes(search);
@@ -423,7 +441,6 @@ export default function ListingsTable() {
   async function handleAddListing() {
     const url = addUrl.trim();
     if (!url) return;
-    // Block duplicates before opening a browser
     const idMatch = url.match(/\/item\/(\d+)/);
     if (idMatch && (listings ?? []).some((l) => l.id === idMatch[1])) {
       setAddState("error");
@@ -457,20 +474,20 @@ export default function ListingsTable() {
     }
   }
 
-
   return (
-    <div className="flex flex-col gap-4">
-      {/* Toolbar: search + add */}
+    <TooltipProvider>
+    <div className="flex flex-col gap-3">
+      {/* Toolbar */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <div className="relative max-w-sm flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <div className="relative flex-1 max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Search listings…"
-              className="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-colors"
+              className="w-full pl-8 pr-4 py-1.5 text-sm bg-white border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
             />
           </div>
           {process.env.NODE_ENV === "development" && (
@@ -481,17 +498,16 @@ export default function ListingsTable() {
                 setAddError("");
                 setTimeout(() => addInputRef.current?.focus(), 50);
               }}
-              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 transition-colors shadow-sm shrink-0"
+              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 transition-colors shadow-sm shrink-0"
             >
-              {addOpen ? <X size={15} /> : <Plus size={15} />}
-              {addOpen ? "Cancel" : "Add listing"}
+              {addOpen ? <X size={14} /> : <Plus size={14} />}
+              {addOpen ? "Cancel" : "Add"}
             </button>
           )}
         </div>
 
-        {/* Add listing form */}
         {process.env.NODE_ENV === "development" && addOpen && (
-          <div className="flex items-start gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+          <div className="flex items-start gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-sm">
             <div className="flex-1">
               <input
                 ref={addInputRef}
@@ -520,7 +536,7 @@ export default function ListingsTable() {
               className="flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors shrink-0"
             >
               {addState === "scraping" ? (
-                <><Loader2 size={13} className="animate-spin" /> Scraping…</>
+                <><Loader2 size={12} className="animate-spin" /> Scraping…</>
               ) : "Scrape"}
             </button>
           </div>
@@ -528,29 +544,29 @@ export default function ListingsTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-auto max-h-[calc(100vh-160px)] rounded-xl border border-slate-200 shadow-sm bg-white">
+      <div className="overflow-auto max-h-[calc(100vh-148px)] rounded-2xl border border-slate-200/80 shadow-sm bg-white">
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b border-slate-200 bg-slate-50">
+              <tr key={hg.id} className="border-b border-slate-100 bg-slate-50/90 backdrop-blur-sm">
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 select-none whitespace-nowrap ${
-                      header.column.getCanSort() ? "cursor-pointer hover:text-slate-800 transition-colors" : ""
+                    className={`px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 select-none whitespace-nowrap ${
+                      header.column.getCanSort() ? "cursor-pointer hover:text-slate-600 transition-colors" : ""
                     }`}
                     onClick={header.column.getToggleSortingHandler()}
                   >
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {header.column.getCanSort() && (
-                        <span className="text-slate-300">
+                        <span>
                           {header.column.getIsSorted() === "asc" ? (
-                            <ChevronUp size={13} className="text-blue-500" />
+                            <ChevronUp size={11} className="text-blue-500" />
                           ) : header.column.getIsSorted() === "desc" ? (
-                            <ChevronDown size={13} className="text-blue-500" />
+                            <ChevronDown size={11} className="text-blue-500" />
                           ) : (
-                            <ChevronsUpDown size={13} />
+                            <ChevronsUpDown size={11} className="text-slate-300" />
                           )}
                         </span>
                       )}
@@ -563,13 +579,13 @@ export default function ListingsTable() {
           <tbody>
             {listings === null ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-400 text-sm">
+                <td colSpan={columns.length} className="px-3 py-12 text-center text-slate-400 text-sm">
                   Loading…
                 </td>
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-400 text-sm">
+                <td colSpan={columns.length} className="px-3 py-12 text-center text-slate-400 text-sm">
                   No listings found.
                 </td>
               </tr>
@@ -577,11 +593,11 @@ export default function ListingsTable() {
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors"
+                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 cursor-pointer transition-colors duration-100"
                   onClick={() => setSelectedListing(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 align-middle">
+                    <td key={cell.id} className="px-3 py-1 align-middle">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -592,12 +608,10 @@ export default function ListingsTable() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-400">
-        {table.getFilteredRowModel().rows.length} listing
-        {table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
+      <p className="text-[11px] text-slate-400 font-medium">
+        {table.getFilteredRowModel().rows.length} listing{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
       </p>
 
-      {/* Modal */}
       {selectedListing && (
         <ListingModal
           listing={selectedListing}
@@ -612,5 +626,6 @@ export default function ListingsTable() {
         />
       )}
     </div>
+    </TooltipProvider>
   );
 }

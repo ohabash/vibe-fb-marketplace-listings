@@ -74,7 +74,16 @@ function parseHTML(html: string): Partial<Listing> {
 
   const title = unescape(find1(/"marketplace_listing_title":"((?:[^"\\]|\\.)*)"/, chunk));
   const priceAmount = find1(/"listing_price":\{"amount":"([^"]+)"/, chunk);
-  const priceCurrency = find1(/"listing_price":\{[^}]*"currency":"([^"]+)"/, chunk);
+  const priceCurrencyRaw = find1(/"listing_price":\{[^}]*"currency":"([^"]+)"/, chunk);
+  // FB puts the human-readable price in a sibling "formatted_price" object, not inside listing_price.
+  // Prefer that over the (sometimes USD-converted) formatted_amount field.
+  const priceText = find1(/"formatted_price":\{"text":"([^"]+)"/, chunk);
+  // Derive currency from formatted text when FB omits it from listing_price (e.g. MX$ → MXN)
+  const priceCurrency = priceCurrencyRaw
+    || (priceText.startsWith("MX$") ? "MXN" : "USD");
+  // DEBUG: log the raw listing_price JSON so we can see all available fields
+  const rawPriceObj = html.slice(priceIdx, priceIdx + 300);
+  console.log("[scraper] raw listing_price:", rawPriceObj);
 
   const descMatch = chunk.match(/"redacted_description":\{"text":"([\s\S]*?)"(?:,|\})/);
   const description = descMatch ? unescape(descMatch[1]) : "";
@@ -138,6 +147,7 @@ function parseHTML(html: string): Partial<Listing> {
     price: {
       amount: priceAmount ? parseFloat(priceAmount) : null,
       currency: priceCurrency || "USD",
+      ...(priceText ? { text: unescape(priceText) } : {}),
     },
     description,
     condition: "",
