@@ -27,7 +27,10 @@ const AMENITY_TOGGLES: { key: keyof Listing["inferred"]; label: string; emoji: s
   { key: "wifi",     label: "WiFi",     emoji: "📶" },
   { key: "terrace",  label: "Terrace",  emoji: "🌿" },
   { key: "jacuzzi",  label: "Jacuzzi",  emoji: "🛁" },
-  { key: "security", label: "Security", emoji: "🔒" },
+  { key: "security",     label: "Security", emoji: "🔒" },
+  { key: "hasFurniture",            label: "Furnished",   emoji: "🛋️" },
+  { key: "hasWasherDryer",          label: "W/D In-unit", emoji: "🧺" },
+  { key: "hasWasherDryerInHookUps", label: "W/D Hookups", emoji: "🔌" },
 ];
 
 interface Props {
@@ -83,6 +86,9 @@ export default function ListingModal({
     terrace: "unknown" as const,
     jacuzzi: "unknown" as const,
     security: "unknown" as const,
+    hasFurniture: "unknown" as const,
+    hasWasherDryer: "unknown" as const,
+    hasWasherDryerInHookUps: "unknown" as const,
   };
   const [inferred, setInferred] = useState(current.inferred ?? defaultInferred);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,9 +209,9 @@ export default function ListingModal({
       </div>
 
       {/* Unit details badges */}
-      {current.unit_details.length > 0 && (
+      {(current.unit_details?.length ?? 0) > 0 && (
         <div className="flex flex-wrap gap-2">
-          {current.unit_details.map((d, i) => (
+          {(current.unit_details ?? []).map((d, i) => (
             <span key={i} className="text-xs font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
               {d}
             </span>

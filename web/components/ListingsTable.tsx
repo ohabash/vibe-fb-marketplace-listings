@@ -27,6 +27,7 @@ import FbReloginButton from "./FbReloginButton";
 const columnHelper = createColumnHelper<Listing>();
 
 function formatPrice(listing: Listing) {
+  if (listing.price.text) return listing.price.text;
   if (listing.price.amount == null) return "—";
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
@@ -75,7 +76,10 @@ const INFERRED_AMENITIES: { key: keyof Listing["inferred"]; label: string; emoji
   { key: "wifi",     label: "WiFi",     emoji: "📶" },
   { key: "terrace",  label: "Terrace",  emoji: "🌿" },
   { key: "jacuzzi",  label: "Jacuzzi",  emoji: "🛁" },
-  { key: "security", label: "Security", emoji: "🔒" },
+  { key: "security",     label: "Security",  emoji: "🔒" },
+  { key: "hasFurniture",          label: "Furnished",      emoji: "🛋️" },
+  { key: "hasWasherDryer",        label: "W/D In-unit",    emoji: "🧺" },
+  { key: "hasWasherDryerInHookUps", label: "W/D Hookups", emoji: "🔌" },
 ];
 
 function AmenityBadges({ listing }: { listing: Listing }) {
@@ -483,7 +487,7 @@ export default function ListingsTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto [overflow-y:clip] rounded-xl border border-slate-200 shadow-sm bg-white">
+      <div className="overflow-auto max-h-[calc(100vh-160px)] rounded-xl border border-slate-200 shadow-sm bg-white">
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (

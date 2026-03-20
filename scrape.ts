@@ -11,7 +11,7 @@ const DEBUG = process.argv.includes("--debug");
 interface Listing {
   id: string;
   title: string;
-  price: { amount: number | null; currency: string };
+  price: { amount: number | null; currency: string; text?: string };
   description: string;
   condition: string;
   category: string;
@@ -95,15 +95,18 @@ async function localizeImages(id: string, remoteUrls: string[]): Promise<string[
 // FB embeds the full listing JSON in the page source with escaped slashes (\/).
 function parseHTML(html: string): Partial<Listing> {
   // Primary anchor: listing_price — this is always adjacent to all listing data
-  const priceIdx = html.indexOf('"listing_price":{"amount":');
+  const priceIdx = html.indexOf('"listing_price":');
   if (priceIdx === -1) return {};
   // Wide window: 100K before anchor (covers listing_photos, actors, description)
   // and 30K after (covers geo, category, etc.)
   const chunk = html.slice(Math.max(0, priceIdx - 100000), priceIdx + 30000);
 
   const title = unescape(find1(/"marketplace_listing_title":"((?:[^"\\]|\\.)*)"/, chunk));
-  const priceAmount = find1(/"listing_price":\{"amount":"([^"]+)"/, chunk);
-  const priceCurrency = find1(/"listing_price":\{[^}]*"currency":"([^"]+)"/, chunk);
+  // Extract price directly from the anchor to avoid picking up an earlier USD-normalized field
+  const priceAnchorChunk = html.slice(priceIdx, priceIdx + 200);
+  const priceAmount = find1(/"listing_price":\{[^}]*"amount":"([^"]+)"/, priceAnchorChunk);
+  const priceCurrency = find1(/"listing_price":\{[^}]*"currency":"([^"]+)"/, priceAnchorChunk);
+  const priceText = find1(/"formatted_price":\{"text":"([^"]+)"/, priceAnchorChunk);
 
   // Description — stop at the closing " that is not escaped
   const descMatch = chunk.match(/"redacted_description":\{"text":"([\s\S]*?)"(?:,|\})/);
@@ -162,7 +165,8 @@ function parseHTML(html: string): Partial<Listing> {
     title,
     price: {
       amount: priceAmount ? parseFloat(priceAmount) : null,
-      currency: priceCurrency || "USD",
+      currency: priceCurrency || "MXN",
+      text: priceText || undefined,
     },
     description,
     condition: "",

@@ -1,7 +1,7 @@
 export interface Listing {
   id: string;
   title: string;
-  price: { amount: number | null; currency: string };
+  price: { amount: number | null; currency: string; text?: string };
   description: string;
   condition: string;
   category: string;
@@ -37,5 +37,6 @@ export interface Listing {
     terrace: "unknown" | boolean; // display as amenity
     jacuzzi: "unknown" | boolean; // display as amenity
     security: "unknown" | boolean; // display as amenity
+    hasFurniture?: "unknown" | boolean; // display as amenity
   };
 }
