@@ -142,6 +142,11 @@ export default function ListingsTable() {
     setSelectedListing((prev) => (prev?.id === id ? { ...prev, hearted } : prev));
   }, []);
 
+  const handleHeart2Change = useCallback((id: string, hearted2: boolean) => {
+    setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, hearted2 } : l)));
+    setSelectedListing((prev) => (prev?.id === id ? { ...prev, hearted2 } : prev));
+  }, []);
+
   const handleInferredChange = useCallback((id: string, inferred: Listing["inferred"]) => {
     setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, inferred } : l)));
     setSelectedListing((prev) => (prev?.id === id ? { ...prev, inferred } : prev));
@@ -332,16 +337,16 @@ export default function ListingsTable() {
         },
       }),
 
-      // Heart
+      // Hearts
       columnHelper.display({
         id: "heart",
         header: "",
         enableSorting: false,
         cell: (info) => (
-          <HeartButton
-            listing={info.row.original}
-            onChange={handleHeartChange}
-          />
+          <div className="flex items-center">
+            <HeartButton listing={info.row.original} onChange={handleHeartChange} />
+            <HeartButton listing={info.row.original} onChange={handleHeart2Change} field="hearted2" />
+          </div>
         ),
       }),
 
@@ -360,7 +365,7 @@ export default function ListingsTable() {
         ),
       }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [handleNotesChange, handleHeartChange, handleRescrapeComplete, handleDeleteComplete]);
+  ], [handleNotesChange, handleHeartChange, handleHeart2Change, handleRescrapeComplete, handleDeleteComplete]);
 
   const table = useReactTable({
     data: listings ?? [],
@@ -568,6 +573,7 @@ export default function ListingsTable() {
           onRescrapeComplete={handleRescrapeComplete}
           onDeleteComplete={handleDeleteComplete}
           onHeartChange={handleHeartChange}
+          onHeart2Change={handleHeart2Change}
         />
       )}
     </div>

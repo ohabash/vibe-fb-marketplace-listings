@@ -43,6 +43,7 @@ interface Props {
   onRescrapeComplete: (updated: Listing) => void;
   onDeleteComplete: (id: string) => void;
   onHeartChange: (id: string, hearted: boolean) => void;
+  onHeart2Change: (id: string, hearted2: boolean) => void;
 }
 
 export default function ListingModal({
@@ -54,6 +55,7 @@ export default function ListingModal({
   onRescrapeComplete,
   onDeleteComplete,
   onHeartChange,
+  onHeart2Change,
 }: Props) {
   const [current, setCurrent] = useState<Listing>(listing);
   const currentIndex = allListings.findIndex((l) => l.id === current.id);
@@ -192,6 +194,7 @@ export default function ListingModal({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HeartButton listing={current} onChange={onHeartChange} size={18} />
+          <HeartButton listing={current} onChange={onHeart2Change} field="hearted2" size={18} />
           <ActionMenu
             listing={current}
             onRescrapeComplete={(updated) => { setCurrent(updated); onRescrapeComplete(updated); }}
