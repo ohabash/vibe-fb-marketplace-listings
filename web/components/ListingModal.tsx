@@ -17,6 +17,7 @@ import {
 import { IoLocationSharp } from "react-icons/io5";
 import type { Listing } from "@/types/listing.types";
 import ActionMenu from "./ActionMenu";
+import HeartButton from "./HeartButton";
 
 const AMENITY_TOGGLES: { key: keyof Listing["inferred"]; label: string; emoji: string }[] = [
   { key: "parking",  label: "Parking",  emoji: "🚗" },
@@ -37,6 +38,7 @@ interface Props {
   onInferredChange: (id: string, inferred: Listing["inferred"]) => void;
   onRescrapeComplete: (updated: Listing) => void;
   onDeleteComplete: (id: string) => void;
+  onHeartChange: (id: string, hearted: boolean) => void;
 }
 
 export default function ListingModal({
@@ -47,6 +49,7 @@ export default function ListingModal({
   onInferredChange,
   onRescrapeComplete,
   onDeleteComplete,
+  onHeartChange,
 }: Props) {
   const [current, setCurrent] = useState<Listing>(listing);
   const currentIndex = allListings.findIndex((l) => l.id === current.id);
@@ -274,6 +277,7 @@ export default function ListingModal({
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <HeartButton listing={current} onChange={onHeartChange} size={18} />
               <ActionMenu
                 listing={current}
                 onRescrapeComplete={(updated) => {

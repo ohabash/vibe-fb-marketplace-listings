@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import {
   useReactTable,
@@ -20,6 +20,8 @@ import { ref, onValue } from "firebase/database";
 import { db } from "@/lib/firebase";
 import ListingModal from "./ListingModal";
 import ActionMenu from "./ActionMenu";
+import NotesPopover from "./NotesPopover";
+import HeartButton from "./HeartButton";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -32,14 +34,6 @@ function formatPrice(listing: Listing) {
   }).format(listing.price.amount);
 }
 
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 // Extract numeric bed count from unit_details
 function getBeds(unit_details: string[] | undefined): number | null {
@@ -132,8 +126,32 @@ export default function ListingsTable() {
   const [addError, setAddError] = useState("");
   const addInputRef = useRef<HTMLInputElement>(null);
 
-  const columns = useMemo(
-    () => [
+  const handleNotesChange = useCallback((id: string, notes: string) => {
+    setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, notes } : l)));
+    setSelectedListing((prev) => (prev?.id === id ? { ...prev, notes } : prev));
+  }, []);
+
+  const handleHeartChange = useCallback((id: string, hearted: boolean) => {
+    setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, hearted } : l)));
+    setSelectedListing((prev) => (prev?.id === id ? { ...prev, hearted } : prev));
+  }, []);
+
+  const handleInferredChange = useCallback((id: string, inferred: Listing["inferred"]) => {
+    setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, inferred } : l)));
+    setSelectedListing((prev) => (prev?.id === id ? { ...prev, inferred } : prev));
+  }, []);
+
+  const handleRescrapeComplete = useCallback((updated: Listing) => {
+    setListings((prev) => (prev ?? []).map((l) => (l.id === updated.id ? updated : l)));
+    setSelectedListing((prev) => (prev?.id === updated.id ? updated : prev));
+  }, []);
+
+  const handleDeleteComplete = useCallback((id: string) => {
+    setListings((prev) => (prev ?? []).filter((l) => l.id !== id));
+    setSelectedListing((prev) => (prev?.id === id ? null : prev));
+  }, []);
+
+  const columns = useMemo(() => [
       // Thumbnail
       columnHelper.accessor("images", {
         header: "",
@@ -154,7 +172,7 @@ export default function ListingsTable() {
       columnHelper.accessor("title", {
         header: "Listing",
         cell: (info) => {
-          const { notes, id, status } = info.row.original;
+          const { id, status } = info.row.original;
           return (
             <div className="max-w-[220px]">
               <div className="flex items-start gap-1.5 flex-wrap">
@@ -168,15 +186,24 @@ export default function ListingsTable() {
                   <span className="inline-block text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap leading-none self-center">Pending</span>
                 )}
               </div>
-              {notes && (
-                <span className="text-xs text-slate-400 line-clamp-1 mt-0.5 italic">
-                  {notes}
-                </span>
-              )}
+
               <span className="text-[10px] text-slate-300 font-mono mt-0.5 block">{id}</span>
             </div>
           );
         },
+      }),
+
+      // Notes popover
+      columnHelper.display({
+        id: "notes_popover",
+        header: "",
+        enableSorting: false,
+        cell: (info) => (
+          <NotesPopover
+            listing={info.row.original}
+            onSave={handleNotesChange}
+          />
+        ),
       }),
 
       // Price
@@ -299,34 +326,35 @@ export default function ListingsTable() {
         },
       }),
 
-      // Posted date
-      columnHelper.accessor("posted_at", {
-        header: "Posted",
+      // Heart
+      columnHelper.display({
+        id: "heart",
+        header: "",
+        enableSorting: false,
         cell: (info) => (
-          <span className="text-slate-500 whitespace-nowrap text-xs">{formatDate(info.getValue())}</span>
+          <HeartButton
+            listing={info.row.original}
+            onChange={handleHeartChange}
+          />
         ),
       }),
 
-      // Actions (dev only)
-      ...(process.env.NODE_ENV === "development" ? [
-        columnHelper.display({
-          id: "actions",
-          header: "",
-          enableSorting: false,
-          cell: (info) => (
-            <ActionMenu
-              listing={info.row.original}
-              onRescrapeComplete={handleRescrapeComplete}
-              onDeleteComplete={handleDeleteComplete}
-              variant="row"
-            />
-          ),
-        }),
-      ] : []),
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+      // Actions
+      columnHelper.display({
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: (info) => (
+          <ActionMenu
+            listing={info.row.original}
+            onRescrapeComplete={handleRescrapeComplete}
+            onDeleteComplete={handleDeleteComplete}
+            variant="row"
+          />
+        ),
+      }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [handleNotesChange, handleHeartChange, handleRescrapeComplete, handleDeleteComplete]);
 
   const table = useReactTable({
     data: listings ?? [],
@@ -383,39 +411,6 @@ export default function ListingsTable() {
     }
   }
 
-  function handleNotesChange(id: string, notes: string) {
-    setListings((prev) =>
-      (prev ?? []).map((l) => (l.id === id ? { ...l, notes } : l))
-    );
-    if (selectedListing?.id === id) {
-      setSelectedListing((prev) => (prev ? { ...prev, notes } : prev));
-    }
-  }
-
-  function handleInferredChange(id: string, inferred: Listing["inferred"]) {
-    setListings((prev) =>
-      (prev ?? []).map((l) => (l.id === id ? { ...l, inferred } : l))
-    );
-    if (selectedListing?.id === id) {
-      setSelectedListing((prev) => (prev ? { ...prev, inferred } : prev));
-    }
-  }
-
-  function handleRescrapeComplete(updated: Listing) {
-    setListings((prev) =>
-      (prev ?? []).map((l) => (l.id === updated.id ? updated : l))
-    );
-    if (selectedListing?.id === updated.id) {
-      setSelectedListing(updated);
-    }
-  }
-
-  function handleDeleteComplete(id: string) {
-    setListings((prev) => (prev ?? []).filter((l) => l.id !== id));
-    if (selectedListing?.id === id) {
-      setSelectedListing(null);
-    }
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -480,11 +475,11 @@ export default function ListingsTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm bg-white">
+      <div className="overflow-x-auto [overflow-y:clip] rounded-xl border border-slate-200 shadow-sm bg-white">
         <table className="w-full text-sm border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
+              <tr key={hg.id} className="border-b border-slate-200 bg-slate-50">
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
@@ -559,6 +554,7 @@ export default function ListingsTable() {
           onInferredChange={handleInferredChange}
           onRescrapeComplete={handleRescrapeComplete}
           onDeleteComplete={handleDeleteComplete}
+          onHeartChange={handleHeartChange}
         />
       )}
     </div>

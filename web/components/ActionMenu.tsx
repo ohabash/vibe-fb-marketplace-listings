@@ -108,15 +108,19 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
 
       {open && !loading && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[170px] bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-          <button
-            onClick={handleRescrape}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
-          >
-            <RefreshCw size={13} className="text-slate-400 shrink-0" />
-            Rescrape listing
-          </button>
+          {process.env.NODE_ENV === "development" && (
+            <>
+              <button
+                onClick={handleRescrape}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+              >
+                <RefreshCw size={13} className="text-slate-400 shrink-0" />
+                Rescrape listing
+              </button>
 
-          <div className="border-t border-slate-100" />
+              <div className="border-t border-slate-100" />
+            </>
+          )}
 
           {confirmDelete ? (
             <div className="px-4 py-2.5">

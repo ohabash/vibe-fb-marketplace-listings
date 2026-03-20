@@ -24,6 +24,7 @@ export interface Listing {
   url: string;
   dateAdded?: number; // Unix ms — set once on first scrape, never overwritten
   notes?: string;
+  hearted?: boolean;
   inferred: {
     pet_friendly: "unknown" | boolean;
     has_view: 1 | 2 | 3;
