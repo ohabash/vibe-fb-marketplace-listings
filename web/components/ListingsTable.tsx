@@ -163,6 +163,16 @@ export default function ListingsTable() {
   }, []);
 
   const columns = useMemo(() => [
+      // Row index
+      columnHelper.display({
+        id: "index",
+        header: "#",
+        enableSorting: false,
+        cell: (info) => (
+          <span className="text-xs text-slate-400 tabular-nums">{info.row.index + 1}</span>
+        ),
+      }),
+
       // Thumbnail
       columnHelper.accessor("images", {
         header: "",

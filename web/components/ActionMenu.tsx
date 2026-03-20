@@ -19,6 +19,8 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
 
   // Close on outside click
   useEffect(() => {
@@ -31,6 +33,19 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
     if (open) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
+
+  function handleToggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen((o) => !o);
+    setConfirmDelete(false);
+  }
 
   async function handleRescrape() {
     setOpen(false);
@@ -84,7 +99,8 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
-        onClick={() => { setOpen((o) => !o); setConfirmDelete(false); }}
+        ref={buttonRef}
+        onClick={handleToggle}
         disabled={loading}
         className={triggerClass}
         aria-haspopup="true"
@@ -103,7 +119,7 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
       </button>
 
       {error && (
-        <div className="absolute right-0 top-full mt-1 z-50 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 shadow min-w-[200px]">
+        <div style={dropdownStyle} className="z-[9999] text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 shadow min-w-[200px]">
           {error.includes("SESSION_EXPIRED") ? (
             <div className="flex flex-col gap-2">
               <span className="text-red-600 font-medium">Facebook session expired</span>
@@ -116,7 +132,7 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
       )}
 
       {open && !loading && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[170px] bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+        <div style={dropdownStyle} className="z-[9999] min-w-[170px] bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
           {process.env.NODE_ENV === "development" && (
             <>
               <button
