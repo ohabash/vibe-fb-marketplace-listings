@@ -25,6 +25,8 @@ import NotesPopover from "./NotesPopover";
 import HeartButton from "./HeartButton";
 import FbReloginButton from "./FbReloginButton";
 import { Tip, TooltipProvider } from "./Tooltip";
+import AmenityFilter from "./AmenityFilter";
+import { getListingAmenities } from "@/hooks/useAmenities";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -59,38 +61,8 @@ function scaleClass(v: number) {
   return "bg-slate-50 text-slate-500 border-slate-200";
 }
 
-const SCRAPED_AMENITIES: { label: string; emoji: string; check: (ud: string[]) => boolean }[] = [
-  { label: "In-unit Laundry", emoji: "🧺", check: (ud) => ud.some((d) => /in.unit laundry/i.test(d)) },
-  { label: "Building Laundry", emoji: "🏢", check: (ud) => ud.some((d) => /laundry in building/i.test(d)) },
-  { label: "Parking",         emoji: "🚗", check: (ud) => ud.some((d) => /parking/i.test(d)) },
-];
-
-const INFERRED_AMENITIES: { key: keyof Listing["inferred"]; label: string; emoji: string }[] = [
-  { key: "parking",  label: "Parking",  emoji: "🚗" },
-  { key: "pool",     label: "Pool",     emoji: "🏊" },
-  { key: "gym",      label: "Gym",      emoji: "💪" },
-  { key: "elevator", label: "Elevator", emoji: "🛗" },
-  { key: "wifi",     label: "WiFi",     emoji: "📶" },
-  { key: "terrace",  label: "Terrace",  emoji: "🌿" },
-  { key: "jacuzzi",  label: "Jacuzzi",  emoji: "🛁" },
-  { key: "security",     label: "Security",  emoji: "🔒" },
-  { key: "hasFurniture",          label: "Furnished",      emoji: "🛋️" },
-  { key: "hasWasherDryer",        label: "W/D In-unit",    emoji: "🧺" },
-  { key: "hasWasherDryerInHookUps", label: "W/D Hookups",    emoji: "🔌" },
-  { key: "requiresCosigner",        label: "Needs Cosigner", emoji: "📝" },
-];
-
 function AmenityBadges({ listing }: { listing: Listing }) {
-  const all = [
-    ...SCRAPED_AMENITIES
-      .filter(({ check }) => check(listing.unit_details ?? []))
-      .map(({ label, emoji }) => ({ label, emoji })),
-    ...INFERRED_AMENITIES
-      .filter(({ key }) => listing.inferred?.[key] === true)
-      .map(({ label, emoji }) => ({ label, emoji })),
-  ];
-  const seen = new Set<string>();
-  const badges = all.filter(({ label }) => !seen.has(label) && seen.add(label));
+  const badges = getListingAmenities(listing);
   if (badges.length === 0) return <span className="text-slate-300 text-xs">—</span>;
   return (
     <div className="flex gap-1 flex-wrap">
@@ -123,7 +95,24 @@ export default function ListingsTable() {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [amenityFilters, setAmenityFilters] = useState<Set<string>>(new Set());
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+
+  const isFiltered = globalFilter.length > 0 || amenityFilters.size > 0 || sorting.length > 0;
+
+  function clearAll() {
+    setGlobalFilter("");
+    setAmenityFilters(new Set());
+    setSorting([]);
+  }
+
+  const filteredListings = useMemo(() => {
+    if (!amenityFilters.size) return listings ?? [];
+    return (listings ?? []).filter((l) => {
+      const has = new Set(getListingAmenities(l).map((a) => a.label));
+      return [...amenityFilters].every((f) => has.has(f));
+    });
+  }, [listings, amenityFilters]);
 
   const [addUrl, setAddUrl] = useState("");
   const [addOpen, setAddOpen] = useState(false);
@@ -466,7 +455,7 @@ export default function ListingsTable() {
   ], [handleNotesChange, handleHeartChange, handleHeart2Change, handleRescrapeComplete, handleDeleteComplete]);
 
   const table = useReactTable({
-    data: listings ?? [],
+    data: filteredListings,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -521,9 +510,65 @@ export default function ListingsTable() {
   return (
     <TooltipProvider>
     <div className="flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-2xl font-bold text-slate-900">Marketplace Listings</h1>
+        {process.env.NODE_ENV === "development" && (
+          <button
+            onClick={() => {
+              setAddOpen((o) => !o);
+              setAddState("idle");
+              setAddError("");
+              setTimeout(() => addInputRef.current?.focus(), 50);
+            }}
+            className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 transition-colors shadow-sm shrink-0"
+          >
+            {addOpen ? <X size={14} /> : <Plus size={14} />}
+            {addOpen ? "Cancel" : "Add"}
+          </button>
+        )}
+      </div>
+
+      {process.env.NODE_ENV === "development" && addOpen && (
+        <div className="flex items-start gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-sm">
+          <div className="flex-1">
+            <input
+              ref={addInputRef}
+              type="url"
+              value={addUrl}
+              onChange={(e) => { setAddUrl(e.target.value); setAddState("idle"); setAddError(""); }}
+              onKeyDown={(e) => e.key === "Enter" && handleAddListing()}
+              placeholder="Paste Facebook Marketplace URL…"
+              className="w-full text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+              disabled={addState === "scraping"}
+            />
+            {addState === "error" && (
+              addError.includes("SESSION_EXPIRED") ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-red-500">Facebook session expired</span>
+                  <FbReloginButton />
+                </div>
+              ) : (
+                <p className="text-xs text-red-500 mt-1">{addError}</p>
+              )
+            )}
+          </div>
+          <button
+            onClick={handleAddListing}
+            disabled={addState === "scraping" || !addUrl.trim()}
+            className="flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors shrink-0"
+          >
+            {addState === "scraping" ? (
+              <><Loader2 size={12} className="animate-spin" /> Scraping…</>
+            ) : "Scrape"}
+          </button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
+          {/* Search — left */}
           <div className="relative flex-1 max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
@@ -534,57 +579,24 @@ export default function ListingsTable() {
               className="w-full pl-8 pr-4 py-1.5 text-sm bg-white border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
             />
           </div>
-          {process.env.NODE_ENV === "development" && (
-            <button
-              onClick={() => {
-                setAddOpen((o) => !o);
-                setAddState("idle");
-                setAddError("");
-                setTimeout(() => addInputRef.current?.focus(), 50);
-              }}
-              className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 transition-colors shadow-sm shrink-0"
-            >
-              {addOpen ? <X size={14} /> : <Plus size={14} />}
-              {addOpen ? "Cancel" : "Add"}
-            </button>
-          )}
+
+          {/* Right side actions */}
+          <div className="flex items-center gap-2 ml-auto">
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={clearAll}
+                className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 transition-colors shadow-sm shrink-0"
+              >
+                <X size={14} />
+                <span className="hidden sm:inline">Clear</span>
+              </button>
+            )}
+
+            <AmenityFilter value={amenityFilters} onChange={setAmenityFilters} />
+          </div>
         </div>
 
-        {process.env.NODE_ENV === "development" && addOpen && (
-          <div className="flex items-start gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-sm">
-            <div className="flex-1">
-              <input
-                ref={addInputRef}
-                type="url"
-                value={addUrl}
-                onChange={(e) => { setAddUrl(e.target.value); setAddState("idle"); setAddError(""); }}
-                onKeyDown={(e) => e.key === "Enter" && handleAddListing()}
-                placeholder="Paste Facebook Marketplace URL…"
-                className="w-full text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
-                disabled={addState === "scraping"}
-              />
-              {addState === "error" && (
-                addError.includes("SESSION_EXPIRED") ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-red-500">Facebook session expired</span>
-                    <FbReloginButton />
-                  </div>
-                ) : (
-                  <p className="text-xs text-red-500 mt-1">{addError}</p>
-                )
-              )}
-            </div>
-            <button
-              onClick={handleAddListing}
-              disabled={addState === "scraping" || !addUrl.trim()}
-              className="flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors shrink-0"
-            >
-              {addState === "scraping" ? (
-                <><Loader2 size={12} className="animate-spin" /> Scraping…</>
-              ) : "Scrape"}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Table */}
