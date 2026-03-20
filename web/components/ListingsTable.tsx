@@ -133,6 +133,50 @@ export default function ListingsTable() {
 
   const indexBufferRef = useRef<string>("");
   const indexTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    let startX = 0;
+    let startY = 0;
+    let axis: "x" | "y" | null = null;
+
+    function onTouchStart(e: TouchEvent) {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      axis = null;
+      el!.style.overflowX = "";
+      el!.style.overflowY = "";
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (axis) return;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (dx < 4 && dy < 4) return;
+      axis = dx > dy ? "x" : "y";
+      el!.style.overflowX = axis === "y" ? "hidden" : "";
+      el!.style.overflowY = axis === "x" ? "hidden" : "";
+    }
+
+    function onTouchEnd() {
+      el!.style.overflowX = "";
+      el!.style.overflowY = "";
+      axis = null;
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -544,7 +588,7 @@ export default function ListingsTable() {
       </div>
 
       {/* Table */}
-      <div className="overflow-auto max-h-[calc(100vh-148px)] rounded-2xl border border-slate-200/80 shadow-sm bg-white">
+      <div ref={tableScrollRef} className="overflow-auto max-h-[calc(100vh-148px)] rounded-2xl border border-slate-200/80 shadow-sm bg-white">
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
