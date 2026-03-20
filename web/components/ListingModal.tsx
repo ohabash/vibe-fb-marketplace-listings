@@ -159,6 +159,7 @@ export default function ListingModal({
   }
 
   const formatPrice = (l: Listing) => {
+    if (!l.price) return "—";
     if (l.price.amount == null) return "—";
     return new Intl.NumberFormat("es-MX", {
       style: "currency",
@@ -228,9 +229,9 @@ export default function ListingModal({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <InfoRow icon={<MapPin size={14} />} label="Location">
           {(() => {
-            const { latitude, longitude } = current.location.coordinates;
-            const label = [current.location.city, current.location.state, current.location.country]
-              .filter(Boolean).join(", ") + (current.location.postal_code ? ` (${current.location.postal_code})` : "");
+            const { latitude, longitude } = current.location?.coordinates ?? {};
+            const label = [current.location?.city, current.location?.state, current.location?.country]
+              .filter(Boolean).join(", ") + (current.location?.postal_code ? ` (${current.location.postal_code})` : "");
             const mapsUrl = latitude != null && longitude != null
               ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
             return mapsUrl ? (

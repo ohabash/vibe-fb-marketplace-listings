@@ -27,6 +27,7 @@ import FbReloginButton from "./FbReloginButton";
 const columnHelper = createColumnHelper<Listing>();
 
 function formatPrice(listing: Listing) {
+  if (!listing.price) return "—";
   if (listing.price.text) return listing.price.text;
   if (listing.price.amount == null) return "—";
   return new Intl.NumberFormat("es-MX", {
@@ -131,6 +132,30 @@ export default function ListingsTable() {
   const [addState, setAddState] = useState<"idle" | "scraping" | "error">("idle");
   const [addError, setAddError] = useState("");
   const addInputRef = useRef<HTMLInputElement>(null);
+  const indexBufferRef = useRef<string>("");
+  const indexTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (!/^\d$/.test(e.key)) return;
+      indexBufferRef.current += e.key;
+      if (indexTimerRef.current) clearTimeout(indexTimerRef.current);
+      indexTimerRef.current = setTimeout(() => {
+        const idx = parseInt(indexBufferRef.current, 10) - 1;
+        indexBufferRef.current = "";
+        setListings((prev) => {
+          if (prev && idx >= 0 && idx < prev.length) {
+            setSelectedListing(prev[idx]);
+          }
+          return prev;
+        });
+      }, 400);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleNotesChange = useCallback((id: string, notes: string) => {
     setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, notes } : l)));
@@ -228,7 +253,7 @@ export default function ListingsTable() {
       }),
 
       // Price
-      columnHelper.accessor((row) => row.price.amount, {
+      columnHelper.accessor((row) => row.price?.amount ?? null, {
         id: "price",
         header: "Price/mo",
         cell: (info) => (
@@ -240,12 +265,12 @@ export default function ListingsTable() {
 
       // Location: city + postal code
       columnHelper.accessor(
-        (row) => `${row.location.city} ${row.location.postal_code}`.trim(),
+        (row) => `${row.location?.city ?? ""} ${row.location?.postal_code ?? ""}`.trim(),
         {
           id: "location",
           header: "Location",
           cell: (info) => {
-            const { city, state, postal_code, coordinates } = info.row.original.location;
+            const { city, state, postal_code, coordinates } = info.row.original.location ?? {};
             const { latitude, longitude } = coordinates ?? {};
             const mapsUrl = latitude != null && longitude != null
               ? `https://www.google.com/maps?q=${latitude},${longitude}`
