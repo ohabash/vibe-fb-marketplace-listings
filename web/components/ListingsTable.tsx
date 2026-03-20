@@ -26,7 +26,7 @@ import HeartButton from "./HeartButton";
 import FbReloginButton from "./FbReloginButton";
 import { Tip, TooltipProvider } from "./Tooltip";
 import AmenityFilter from "./AmenityFilter";
-import { getListingAmenities } from "@/hooks/useAmenities";
+import { getListingAmenities, ALL_FILTER_AMENITIES } from "@/hooks/useAmenities";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -109,8 +109,10 @@ export default function ListingsTable() {
   const filteredListings = useMemo(() => {
     if (!amenityFilters.size) return listings ?? [];
     return (listings ?? []).filter((l) => {
-      const has = new Set(getListingAmenities(l).map((a) => a.label));
-      return [...amenityFilters].every((f) => has.has(f));
+      return [...amenityFilters].every((f) => {
+        const def = ALL_FILTER_AMENITIES.find((a) => a.label === f);
+        return def ? def.match(l) : false;
+      });
     });
   }, [listings, amenityFilters]);
 
@@ -509,10 +511,10 @@ export default function ListingsTable() {
 
   return (
     <TooltipProvider>
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2 sm:gap-3 h-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <h1 className="text-2xl font-bold text-slate-900">Marketplace Listings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Marketplace Listings</h1>
         {process.env.NODE_ENV === "development" && (
           <button
             onClick={() => {
@@ -600,7 +602,7 @@ export default function ListingsTable() {
       </div>
 
       {/* Table */}
-      <div ref={tableScrollRef} className="overflow-auto max-h-[calc(100vh-148px)] rounded-2xl border border-slate-200/80 shadow-sm bg-white">
+      <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-auto rounded-2xl border border-slate-200/80 shadow-sm bg-white">
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (

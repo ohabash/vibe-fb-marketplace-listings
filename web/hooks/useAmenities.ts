@@ -50,6 +50,20 @@ export const AMENITY_DEFINITIONS: AmenityDef[] = [
   { label: "Needs Cosigner",  emoji: "📝",  match: (l) => l.inferred?.requiresCosigner === true },
 ];
 
+/**
+ * Filter-only entries — shown in the amenity filter dropdown but NOT
+ * displayed as badges in the amenities column.
+ */
+export const FILTER_ONLY_AMENITIES: AmenityDef[] = [
+  { label: "Pet Friendly", emoji: "🐾", match: (l) => l.inferred?.pet_friendly === true },
+];
+
+/** All amenities available in the filter dropdown (column badges + filter-only). */
+export const ALL_FILTER_AMENITIES: AmenityDef[] = [
+  ...AMENITY_DEFINITIONS,
+  ...FILTER_ONLY_AMENITIES,
+];
+
 /** Returns the amenities a listing has, in definition order, deduped. */
 export function getListingAmenities(listing: Listing): { label: string; emoji: string }[] {
   return AMENITY_DEFINITIONS

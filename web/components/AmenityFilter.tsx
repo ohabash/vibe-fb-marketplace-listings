@@ -2,7 +2,7 @@
 
 import * as Popover from "@radix-ui/react-popover";
 import { SlidersHorizontal, X } from "lucide-react";
-import { AMENITY_DEFINITIONS } from "@/hooks/useAmenities";
+import { ALL_FILTER_AMENITIES } from "@/hooks/useAmenities";
 
 interface Props {
   value: Set<string>;
@@ -43,7 +43,7 @@ export default function AmenityFilter({ value, onChange }: Props) {
       <Popover.Portal>
         <Popover.Content
           side="bottom"
-          align="start"
+          align="end"
           sideOffset={6}
           className="z-50 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 outline-none"
         >
@@ -64,15 +64,15 @@ export default function AmenityFilter({ value, onChange }: Props) {
           </div>
 
           {/* Checkboxes */}
-          <div className="py-2 max-h-72 overflow-y-auto">
-            {AMENITY_DEFINITIONS.map(({ label, emoji }) => {
+          <div className="py-1 max-h-[60vh] sm:max-h-72 overflow-y-auto">
+            {ALL_FILTER_AMENITIES.map(({ label, emoji }) => {
               const checked = value.has(label);
               return (
                 <button
                   key={label}
                   type="button"
                   onClick={() => toggle(label)}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-left ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 sm:py-2 text-sm transition-colors text-left ${
                     checked ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
