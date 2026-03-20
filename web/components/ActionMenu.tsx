@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, RefreshCw, Trash2 } from "lucide-react";
 import type { Listing } from "@/types/listing.types";
+import FbReloginButton from "./FbReloginButton";
 
 interface Props {
   listing: Listing;
@@ -45,8 +46,9 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
       if (!res.ok) throw new Error(data.error ?? "Scrape failed");
       if (data.listing) onRescrapeComplete(data.listing);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-      setTimeout(() => setError(null), 4000);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError(msg);
+      if (!msg.includes("SESSION_EXPIRED")) setTimeout(() => setError(null), 4000);
     } finally {
       setLoading(false);
     }
@@ -101,8 +103,15 @@ export default function ActionMenu({ listing, onRescrapeComplete, onDeleteComple
       </button>
 
       {error && (
-        <div className="absolute right-0 top-full mt-1 z-50 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 whitespace-nowrap shadow">
-          {error}
+        <div className="absolute right-0 top-full mt-1 z-50 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 shadow min-w-[200px]">
+          {error.includes("SESSION_EXPIRED") ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-red-600 font-medium">Facebook session expired</span>
+              <FbReloginButton />
+            </div>
+          ) : (
+            <span className="text-red-600 whitespace-nowrap">{error}</span>
+          )}
         </div>
       )}
 

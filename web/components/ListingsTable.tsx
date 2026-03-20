@@ -22,6 +22,7 @@ import ListingModal from "./ListingModal";
 import ActionMenu from "./ActionMenu";
 import NotesPopover from "./NotesPopover";
 import HeartButton from "./HeartButton";
+import FbReloginButton from "./FbReloginButton";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -157,7 +158,7 @@ export default function ListingsTable() {
         header: "",
         enableSorting: false,
         cell: (info) => {
-          const imgs = info.getValue();
+          const imgs = info.getValue() ?? [];
           return imgs[0] ? (
             <div className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-slate-100">
               <Image src={imgs[0]} alt="thumbnail" fill className="object-cover" sizes="56px" />
@@ -458,7 +459,14 @@ export default function ListingsTable() {
                 disabled={addState === "scraping"}
               />
               {addState === "error" && (
-                <p className="text-xs text-red-500 mt-1">{addError}</p>
+                addError.includes("SESSION_EXPIRED") ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-red-500">Facebook session expired</span>
+                    <FbReloginButton />
+                  </div>
+                ) : (
+                  <p className="text-xs text-red-500 mt-1">{addError}</p>
+                )
               )}
             </div>
             <button

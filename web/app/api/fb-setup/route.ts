@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   // ── Step 1: start login ──────────────────────────────────────────────────
   if (body.start) {
-    console.log("[fb-setup] Starting fresh FB login from Railway...");
+    console.log("[fb-setup] Starting fresh FB login...");
     await closeActive();
 
     // Clear stale session so we always do a fresh login
@@ -43,8 +43,9 @@ export async function POST(req: NextRequest) {
 
     const { FB_SESSION_B64: _s, ...browserEnv } = process.env;
     void _s;
+    const isDev = process.env.NODE_ENV === "development";
     activeCtx = await chromium.launchPersistentContext(SESSION_DIR, {
-      headless: true,
+      headless: !isDev,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       env: browserEnv as Record<string, string>,
     });
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     try {
       await activePage.waitForURL(
         (u) => !u.pathname.startsWith("/login"),
-        { timeout: 15000 }
+        { timeout: isDev ? 120000 : 15000 }
       );
     } catch { /* fall through */ }
 
