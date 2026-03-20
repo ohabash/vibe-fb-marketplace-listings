@@ -79,7 +79,8 @@ const INFERRED_AMENITIES: { key: keyof Listing["inferred"]; label: string; emoji
   { key: "security",     label: "Security",  emoji: "🔒" },
   { key: "hasFurniture",          label: "Furnished",      emoji: "🛋️" },
   { key: "hasWasherDryer",        label: "W/D In-unit",    emoji: "🧺" },
-  { key: "hasWasherDryerInHookUps", label: "W/D Hookups", emoji: "🔌" },
+  { key: "hasWasherDryerInHookUps", label: "W/D Hookups",    emoji: "🔌" },
+  { key: "requiresCosigner",        label: "Needs Cosigner", emoji: "📝" },
 ];
 
 function AmenityBadges({ listing }: { listing: Listing }) {

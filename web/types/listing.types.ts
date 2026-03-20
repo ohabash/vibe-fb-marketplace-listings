@@ -38,5 +38,8 @@ export interface Listing {
     jacuzzi: "unknown" | boolean; // display as amenity
     security: "unknown" | boolean; // display as amenity
     hasFurniture?: "unknown" | boolean; // display as amenity
+    hasWasherDryer?: "unknown" | boolean; // display as amenity
+    hasWasherDryerInHookUps?: "unknown" | boolean; // display as amenity
+    requiresCosigner?: "unknown" | boolean; // display as amenity
   };
 }

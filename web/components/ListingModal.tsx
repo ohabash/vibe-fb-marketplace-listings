@@ -30,7 +30,8 @@ const AMENITY_TOGGLES: { key: keyof Listing["inferred"]; label: string; emoji: s
   { key: "security",     label: "Security", emoji: "🔒" },
   { key: "hasFurniture",            label: "Furnished",   emoji: "🛋️" },
   { key: "hasWasherDryer",          label: "W/D In-unit", emoji: "🧺" },
-  { key: "hasWasherDryerInHookUps", label: "W/D Hookups", emoji: "🔌" },
+  { key: "hasWasherDryerInHookUps", label: "W/D Hookups",    emoji: "🔌" },
+  { key: "requiresCosigner",        label: "Needs Cosigner", emoji: "📝" },
 ];
 
 interface Props {
@@ -89,6 +90,7 @@ export default function ListingModal({
     hasFurniture: "unknown" as const,
     hasWasherDryer: "unknown" as const,
     hasWasherDryerInHookUps: "unknown" as const,
+    requiresCosigner: "unknown" as const,
   };
   const [inferred, setInferred] = useState(current.inferred ?? defaultInferred);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
