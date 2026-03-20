@@ -54,8 +54,19 @@ export default function ListingModal({
   const [current, setCurrent] = useState<Listing>(listing);
   const currentIndex = allListings.findIndex((l) => l.id === current.id);
 
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
+  // Mobile carousel (Embla)
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setCarouselIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
   const [notes, setNotes] = useState(current.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -76,21 +87,10 @@ export default function ListingModal({
   const [inferred, setInferred] = useState(current.inferred ?? defaultInferred);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
-
-  useEffect(() => {
-    if (!emblaApi) return;
-    const onSelect = () => setCarouselIndex(emblaApi.selectedScrollSnap());
-    emblaApi.on("select", onSelect);
-    return () => { emblaApi.off("select", onSelect); };
-  }, [emblaApi]);
-
-  // Keyboard: Escape = close, ArrowLeft/Right = navigate listings
+  // Keyboard nav
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") { onClose(); return; }
-      // Don't hijack arrows when typing in textarea
       if (document.activeElement?.tagName === "TEXTAREA") return;
       if (e.key === "ArrowLeft") navigate(-1);
       if (e.key === "ArrowRight") navigate(1);
@@ -168,51 +168,199 @@ export default function ListingModal({
     ? current.description.slice(0, 300) + "…"
     : current.description;
 
-  const navBtnClass =
-    "hidden sm:flex items-center justify-center w-11 h-11 rounded-full bg-slate-900/75 hover:bg-slate-900 backdrop-blur-sm shadow-xl text-white transition-all shrink-0";
+  // Shared details content rendered in both layouts
+  const detailsContent = (
+    <div className="flex flex-col gap-5 p-5 sm:p-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 leading-snug">
+            {current.title}
+          </h2>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">
+            {formatPrice(current)}
+            <span className="text-sm font-normal text-slate-500 ml-1">/ mo</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <HeartButton listing={current} onChange={onHeartChange} size={18} />
+          <ActionMenu
+            listing={current}
+            onRescrapeComplete={(updated) => { setCurrent(updated); onRescrapeComplete(updated); }}
+            onDeleteComplete={(id) => { onDeleteComplete(id); onClose(); }}
+            variant="button"
+          />
+          <a
+            href={current.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg px-3 py-2 transition-colors"
+          >
+            <ExternalLink size={13} />
+            Facebook
+          </a>
+        </div>
+      </div>
+
+      {/* Unit details badges */}
+      {current.unit_details.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {current.unit_details.map((d, i) => (
+            <span key={i} className="text-xs font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
+              {d}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Info grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <InfoRow icon={<MapPin size={14} />} label="Location">
+          {(() => {
+            const { latitude, longitude } = current.location.coordinates;
+            const label = [current.location.city, current.location.state, current.location.country]
+              .filter(Boolean).join(", ") + (current.location.postal_code ? ` (${current.location.postal_code})` : "");
+            const mapsUrl = latitude != null && longitude != null
+              ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
+            return mapsUrl ? (
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline">
+                <IoLocationSharp size={14} className="text-red-400 shrink-0" />
+                {label}
+              </a>
+            ) : label;
+          })()}
+        </InfoRow>
+        <InfoRow icon={<Calendar size={14} />} label="Posted">{formatDate(current.posted_at)}</InfoRow>
+        <InfoRow icon={<Tag size={14} />} label="Category">{current.category || "—"}</InfoRow>
+        <InfoRow icon={<Package size={14} />} label="Availability">{current.availability || "—"}</InfoRow>
+        <InfoRow icon={<User size={14} />} label="Seller">
+          <a href={current.seller.profile_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+            {current.seller.name || "—"}
+          </a>
+        </InfoRow>
+      </div>
+
+      {/* Inferred ratings */}
+      <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/60">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Your Assessment</p>
+        <div className="flex flex-wrap gap-5">
+          <InferredToggle label="Pet Friendly" emoji="🐾"
+            options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
+            value={inferred.pet_friendly}
+            activeClass={(v) => v === true ? "bg-emerald-500 text-white" : v === false ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700"}
+            onChange={(v) => handleInferredChange({ pet_friendly: v })}
+          />
+          <InferredToggle label="Has View" emoji="🏙️"
+            options={[[1, "1"], [2, "2"], [3, "3"]] as const}
+            value={inferred.has_view}
+            activeClass={(v) => v === 3 ? "bg-emerald-500 text-white" : v === 2 ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-700"}
+            onChange={(v) => handleInferredChange({ has_view: v })}
+          />
+          <InferredToggle label="Neighborhood" emoji="🏘️"
+            options={[[1, "1"], [2, "2"], [3, "3"]] as const}
+            value={inferred.neighborhood}
+            activeClass={(v) => v === 3 ? "bg-emerald-500 text-white" : v === 2 ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-700"}
+            onChange={(v) => handleInferredChange({ neighborhood: v })}
+          />
+        </div>
+        <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-slate-100">
+          {AMENITY_TOGGLES.map(({ key, label, emoji }) => (
+            <InferredToggle key={key} label={label} emoji={emoji}
+              options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
+              value={(inferred[key] ?? "unknown") as "unknown" | boolean}
+              activeClass={(v) => v === true ? "bg-emerald-500 text-white" : v === false ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700"}
+              onChange={(v) => handleInferredChange({ [key]: v })}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Description */}
+      {current.description && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Description</p>
+          <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+            {descExpanded ? current.description : shortDesc}
+          </p>
+          {current.description.length > 300 && (
+            <button onClick={() => setDescExpanded(!descExpanded)} className="text-xs text-blue-600 hover:underline mt-1">
+              {descExpanded ? "Show less" : "Show more"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Notes */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Notes</p>
+          {saving && <span className="text-xs text-slate-400 animate-pulse">Saving…</span>}
+          {saved && <span className="text-xs text-emerald-500">Saved ✓</span>}
+        </div>
+        <textarea
+          value={notes}
+          onChange={handleNotesChange}
+          placeholder="Add your notes about this listing…"
+          rows={3}
+          className="w-full text-sm border border-slate-200 rounded-xl p-3 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none transition-colors"
+        />
+      </div>
+    </div>
+  );
+
+  // Shared sticky top bar
+  const topBar = (
+    <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-100 px-4 py-2.5 flex items-center justify-between shrink-0">
+      <div className="flex items-center gap-1">
+        {allListings.length > 1 && (
+          <>
+            <button
+              onClick={() => navigate(-1)}
+              disabled={currentIndex === 0}
+              className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              aria-label="Previous listing"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-xs font-medium text-slate-400 tabular-nums px-1">
+              {currentIndex + 1} / {allListings.length}
+            </span>
+            <button
+              onClick={() => navigate(1)}
+              disabled={currentIndex === allListings.length - 1}
+              className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              aria-label="Next listing"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+      </div>
+      <button
+        onClick={onClose}
+        className="p-1.5 rounded-full hover:bg-slate-100 transition-colors"
+        aria-label="Close"
+      >
+        <X size={18} className="text-slate-600" />
+      </button>
+    </div>
+  );
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+      {/* Backdrop — desktop only */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm hidden md:block"
         onClick={onClose}
       />
 
-      {/* Left arrow */}
-      <button
-        onClick={() => navigate(-1)}
-        className={`${navBtnClass} relative z-20 mr-3 ${currentIndex === 0 ? "invisible pointer-events-none" : ""}`}
-        aria-label="Previous listing"
-      >
-        <ChevronLeft size={22} strokeWidth={2.5} />
-      </button>
+      {/* ── MOBILE layout: full-screen, carousel on top, details scroll below ── */}
+      <div className="md:hidden absolute inset-0 bg-white flex flex-col overflow-hidden">
+        {topBar}
 
-      {/* Panel */}
-      <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto flex flex-col">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-white/80 hover:bg-slate-100 transition-colors shadow"
-          aria-label="Close"
-        >
-          <X size={18} className="text-slate-600" />
-        </button>
-
-        {/* Listing counter */}
-        {allListings.length > 1 && (
-          <div className="absolute top-3 left-3 z-20 text-xs font-medium bg-black/40 text-white rounded-full px-2.5 py-1">
-            {currentIndex + 1} / {allListings.length}
-          </div>
-        )}
-
-        {/* Carousel */}
+        {/* Mobile carousel */}
         {current.images.length > 0 && (
-          <div className="relative bg-slate-100 rounded-t-2xl overflow-hidden h-60 sm:h-80 shrink-0">
+          <div className="relative bg-slate-100 h-64 shrink-0">
             <div className="overflow-hidden h-full" ref={emblaRef}>
               <div className="flex h-full">
                 {current.images.map((src, i) => (
@@ -221,40 +369,28 @@ export default function ListingModal({
                       src={src}
                       alt={`${current.title} image ${i + 1}`}
                       fill
-                      className="object-cover"
-                      sizes="(max-width: 672px) 100vw, 672px"
+                      className="object-contain"
+                      sizes="100vw"
                       priority={i === 0}
                     />
                   </div>
                 ))}
               </div>
             </div>
-
             {current.images.length > 1 && (
               <>
-                <button
-                  onClick={scrollPrev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-                  aria-label="Previous image"
-                >
-                  <ChevronLeft size={18} />
+                <button onClick={scrollPrev} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 text-white">
+                  <ChevronLeft size={16} />
                 </button>
-                <button
-                  onClick={scrollNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
-                  aria-label="Next image"
-                >
-                  <ChevronRight size={18} />
+                <button onClick={scrollNext} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 text-white">
+                  <ChevronRight size={16} />
                 </button>
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
                   {current.images.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => emblaApi?.scrollTo(i)}
-                      className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                        i === carouselIndex ? "bg-white" : "bg-white/40"
-                      }`}
-                      aria-label={`Go to image ${i + 1}`}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${i === carouselIndex ? "bg-white" : "bg-white/40"}`}
                     />
                   ))}
                 </div>
@@ -263,173 +399,47 @@ export default function ListingModal({
           </div>
         )}
 
-        {/* Content */}
-        <div className="p-5 sm:p-6 flex flex-col gap-5">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900 leading-snug">
-                {current.title}
-              </h2>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">
-                {formatPrice(current)}
-                <span className="text-sm font-normal text-slate-500 ml-1">/ mo</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <HeartButton listing={current} onChange={onHeartChange} size={18} />
-              <ActionMenu
-                listing={current}
-                onRescrapeComplete={(updated) => {
-                  setCurrent(updated);
-                  onRescrapeComplete(updated);
-                }}
-                onDeleteComplete={(id) => { onDeleteComplete(id); onClose(); }}
-                variant="button"
-              />
-              <a
-                href={current.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg px-3 py-2 transition-colors"
-              >
-                <ExternalLink size={13} />
-                Facebook
-              </a>
-            </div>
-          </div>
-
-          {/* Unit details badges */}
-          {current.unit_details.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {current.unit_details.map((d, i) => (
-                <span key={i} className="text-xs font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
-                  {d}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Info grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <InfoRow icon={<MapPin size={14} />} label="Location">
-              {(() => {
-                const { latitude, longitude } = current.location.coordinates;
-                const label = [current.location.city, current.location.state, current.location.country]
-                  .filter(Boolean)
-                  .join(", ") + (current.location.postal_code ? ` (${current.location.postal_code})` : "");
-                const mapsUrl = latitude != null && longitude != null
-                  ? `https://www.google.com/maps?q=${latitude},${longitude}`
-                  : null;
-                return mapsUrl ? (
-                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:underline">
-                    <IoLocationSharp size={14} className="text-red-400 shrink-0" />
-                    {label}
-                  </a>
-                ) : label;
-              })()}
-            </InfoRow>
-            <InfoRow icon={<Calendar size={14} />} label="Posted">
-              {formatDate(current.posted_at)}
-            </InfoRow>
-            <InfoRow icon={<Tag size={14} />} label="Category">
-              {current.category || "—"}
-            </InfoRow>
-            <InfoRow icon={<Package size={14} />} label="Availability">
-              {current.availability || "—"}
-            </InfoRow>
-            <InfoRow icon={<User size={14} />} label="Seller">
-              <a href={current.seller.profile_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                {current.seller.name || "—"}
-              </a>
-            </InfoRow>
-          </div>
-
-          {/* Inferred ratings */}
-          <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/60">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Your Assessment</p>
-            <div className="flex flex-wrap gap-5">
-              <InferredToggle
-                label="Pet Friendly"
-                emoji="🐾"
-                options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
-                value={inferred.pet_friendly}
-                activeClass={(v) => v === true ? "bg-emerald-500 text-white" : v === false ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700"}
-                onChange={(v) => handleInferredChange({ pet_friendly: v })}
-              />
-              <InferredToggle
-                label="Has View"
-                emoji="🏙️"
-                options={[[1, "1"], [2, "2"], [3, "3"]] as const}
-                value={inferred.has_view}
-                activeClass={(v) => v === 3 ? "bg-emerald-500 text-white" : v === 2 ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-700"}
-                onChange={(v) => handleInferredChange({ has_view: v })}
-              />
-              <InferredToggle
-                label="Neighborhood"
-                emoji="🏘️"
-                options={[[1, "1"], [2, "2"], [3, "3"]] as const}
-                value={inferred.neighborhood}
-                activeClass={(v) => v === 3 ? "bg-emerald-500 text-white" : v === 2 ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-700"}
-                onChange={(v) => handleInferredChange({ neighborhood: v })}
-              />
-            </div>
-            <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-slate-100">
-              {AMENITY_TOGGLES.map(({ key, label, emoji }) => (
-                <InferredToggle
-                  key={key}
-                  label={label}
-                  emoji={emoji}
-                  options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
-                  value={(inferred[key] ?? "unknown") as "unknown" | boolean}
-                  activeClass={(v) => v === true ? "bg-emerald-500 text-white" : v === false ? "bg-red-500 text-white" : "bg-slate-200 text-slate-700"}
-                  onChange={(v) => handleInferredChange({ [key]: v })}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          {current.description && (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Description</p>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-                {descExpanded ? current.description : shortDesc}
-              </p>
-              {current.description.length > 300 && (
-                <button onClick={() => setDescExpanded(!descExpanded)} className="text-xs text-blue-600 hover:underline mt-1">
-                  {descExpanded ? "Show less" : "Show more"}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Notes */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Notes</p>
-              {saving && <span className="text-xs text-slate-400 animate-pulse">Saving…</span>}
-              {saved && <span className="text-xs text-emerald-500">Saved ✓</span>}
-            </div>
-            <textarea
-              value={notes}
-              onChange={handleNotesChange}
-              placeholder="Add your notes about this listing…"
-              rows={3}
-              className="w-full text-sm border border-slate-200 rounded-xl p-3 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none transition-colors"
-            />
-          </div>
+        {/* Mobile details — scroll independently */}
+        <div className="flex-1 overflow-y-auto">
+          {detailsContent}
         </div>
       </div>
 
-      {/* Right arrow */}
-      <button
-        onClick={() => navigate(1)}
-        className={`${navBtnClass} relative z-20 ml-3 ${currentIndex === allListings.length - 1 ? "invisible pointer-events-none" : ""}`}
-        aria-label="Next listing"
-      >
-        <ChevronRight size={22} strokeWidth={2.5} />
-      </button>
+      {/* ── DESKTOP layout: centered modal, 2-column ── */}
+      <div className="hidden md:flex absolute inset-0 items-center justify-center p-4">
+        <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex overflow-hidden">
+
+          {/* Left column: stacked images, independent scroll */}
+          <div className="w-[45%] shrink-0 bg-slate-100 overflow-y-auto">
+            {current.images.length > 0 ? (
+              <div className="flex flex-col gap-2 p-2">
+                {current.images.map((src, i) => (
+                  <Image
+                    key={i}
+                    src={src}
+                    alt={`${current.title} image ${i + 1}`}
+                    width={0}
+                    height={0}
+                    sizes="45vw"
+                    className="w-full h-auto rounded-lg"
+                    priority={i === 0}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-300 text-sm">
+                No images
+              </div>
+            )}
+          </div>
+
+          {/* Right column: details, independent scroll */}
+          <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+            {topBar}
+            {detailsContent}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
