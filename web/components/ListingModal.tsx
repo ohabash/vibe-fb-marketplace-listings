@@ -13,11 +13,16 @@ import {
   Calendar,
   Tag,
   Package,
+  Loader2,
+  ImagePlus,
 } from "lucide-react";
 import { IoLocationSharp } from "react-icons/io5";
+import { Play } from "lucide-react";
 import type { Listing } from "@/types/listing.types";
 import ActionMenu from "./ActionMenu";
 import HeartButton from "./HeartButton";
+import MediaUploader from "./MediaUploader";
+import { uploadMedia } from "@/lib/uploadMedia";
 
 const AMENITY_TOGGLES: { key: keyof Listing["inferred"]; label: string; emoji: string }[] = [
   { key: "parking",  label: "Parking",  emoji: "🚗" },
@@ -44,6 +49,7 @@ interface Props {
   onDeleteComplete: (id: string) => void;
   onHeartChange: (id: string, hearted: boolean) => void;
   onHeart2Change: (id: string, hearted2: boolean) => void;
+  onMediaChange: (id: string, images: string[], videos: string[]) => void;
 }
 
 export default function ListingModal({
@@ -56,6 +62,7 @@ export default function ListingModal({
   onDeleteComplete,
   onHeartChange,
   onHeart2Change,
+  onMediaChange,
 }: Props) {
   const [current, setCurrent] = useState<Listing>(listing);
   const currentIndex = allListings.findIndex((l) => l.id === current.id);
@@ -191,6 +198,50 @@ export default function ListingModal({
   const shortDesc = current.description.length > 300
     ? current.description.slice(0, 300) + "…"
     : current.description;
+
+  // Drag-and-drop upload
+  const dragDepth = useRef(0);
+  const [dropActive, setDropActive] = useState(false);
+  const [dropUploading, setDropUploading] = useState(false);
+
+  function onDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current++;
+    if (dragDepth.current === 1) setDropActive(true);
+  }
+  function onDragLeave() {
+    dragDepth.current--;
+    if (dragDepth.current === 0) setDropActive(false);
+  }
+  function onDragOver(e: React.DragEvent) { e.preventDefault(); }
+  async function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDropActive(false);
+    const files = Array.from(e.dataTransfer.files).filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+    );
+    if (!files.length) return;
+    setDropUploading(true);
+    try {
+      const { images, videos } = await uploadMedia(current.id, files);
+      handleUploadComplete(images, videos);
+    } finally {
+      setDropUploading(false);
+    }
+  }
+
+  // Ordered media: first image, then all videos, then remaining images
+  const orderedMedia: { type: "image" | "video"; src: string }[] = [
+    ...(current.images[0] ? [{ type: "image" as const, src: current.images[0] }] : []),
+    ...(current.videos ?? []).map((src) => ({ type: "video" as const, src })),
+    ...current.images.slice(1).map((src) => ({ type: "image" as const, src })),
+  ];
+
+  function handleUploadComplete(images: string[], videos: string[]) {
+    setCurrent((prev) => ({ ...prev, images, videos }));
+    onMediaChange(current.id, images, videos);
+  }
 
   // Shared details content rendered in both layouts
   const detailsContent = (
@@ -372,37 +423,79 @@ export default function ListingModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50"
+      role="dialog"
+      aria-modal="true"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       {/* Backdrop — desktop only */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm hidden md:block"
         onClick={onClose}
       />
 
+      {/* Drop overlay */}
+      {(dropActive || dropUploading) && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 bg-blue-500/20 backdrop-blur-[2px]" />
+          <div className="relative z-10 bg-white rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center gap-2">
+            {dropUploading ? (
+              <>
+                <Loader2 size={28} className="animate-spin text-blue-500" />
+                <p className="text-sm font-medium text-slate-700">Uploading…</p>
+              </>
+            ) : (
+              <>
+                <ImagePlus size={28} className="text-blue-500" />
+                <p className="text-sm font-medium text-slate-700">Drop to upload</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── MOBILE layout: full-screen, carousel on top, details scroll below ── */}
       <div className="md:hidden absolute inset-0 bg-white flex flex-col overflow-hidden">
         {topBar}
 
         {/* Mobile carousel */}
-        {current.images.length > 0 && (
+        {orderedMedia.length > 0 && (
           <div className="relative bg-slate-100 h-64 shrink-0">
             <div className="overflow-hidden h-full" ref={emblaRef}>
               <div className="flex h-full">
-                {current.images.map((src, i) => (
+                {orderedMedia.map((item, i) => (
                   <div key={i} className="relative flex-none w-full h-full">
-                    <Image
-                      src={src}
-                      alt={`${current.title} image ${i + 1}`}
-                      fill
-                      className="object-contain"
-                      sizes="100vw"
-                      priority={i === 0}
-                    />
+                    {item.type === "video" ? (
+                      <>
+                        <video
+                          src={item.src}
+                          controls
+                          className="w-full h-full object-contain"
+                          preload="metadata"
+                        />
+                        <div className="absolute top-2 left-2 bg-black/60 rounded-full p-1 pointer-events-none">
+                          <Play size={12} className="text-white fill-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <Image
+                        src={item.src}
+                        alt={`${current.title} image ${i + 1}`}
+                        fill
+                        className="object-contain"
+                        sizes="100vw"
+                        priority={i === 0}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-            {current.images.length > 1 && (
+            {orderedMedia.length > 1 && (
               <>
                 <button onClick={scrollPrev} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 text-white">
                   <ChevronLeft size={16} />
@@ -411,7 +504,7 @@ export default function ListingModal({
                   <ChevronRight size={16} />
                 </button>
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {current.images.map((_, i) => (
+                  {orderedMedia.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => emblaApi?.scrollTo(i)}
@@ -434,28 +527,39 @@ export default function ListingModal({
       <div className="hidden md:flex absolute inset-0 items-center justify-center p-4">
         <div className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex overflow-hidden">
 
-          {/* Left column: stacked images, independent scroll */}
-          <div className="w-[45%] shrink-0 bg-slate-100 overflow-y-auto">
-            {current.images.length > 0 ? (
-              <div className="flex flex-col gap-2 p-2">
-                {current.images.map((src, i) => (
-                  <Image
-                    key={i}
-                    src={src}
-                    alt={`${current.title} image ${i + 1}`}
-                    width={0}
-                    height={0}
-                    sizes="45vw"
-                    className="w-full h-auto rounded-lg"
-                    priority={i === 0}
-                  />
+          {/* Left column: stacked media, independent scroll */}
+          <div className="w-[45%] shrink-0 bg-slate-100 overflow-y-auto flex flex-col">
+            {orderedMedia.length > 0 ? (
+              <div className="flex flex-col gap-2 p-2 flex-1">
+                {orderedMedia.map((item, i) => (
+                  item.type === "video" ? (
+                    <video
+                      key={i}
+                      src={item.src}
+                      controls
+                      className="w-full rounded-lg"
+                      preload="metadata"
+                    />
+                  ) : (
+                    <Image
+                      key={i}
+                      src={item.src}
+                      alt={`${current.title} image ${i + 1}`}
+                      width={0}
+                      height={0}
+                      sizes="45vw"
+                      className="w-full h-auto rounded-lg"
+                      priority={i === 0}
+                    />
+                  )
                 ))}
               </div>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-300 text-sm">
+              <div className="flex-1 flex items-center justify-center text-slate-300 text-sm">
                 No images
               </div>
             )}
+            <MediaUploader listingId={current.id} onUploadComplete={handleUploadComplete} />
           </div>
 
           {/* Right column: details, independent scroll */}

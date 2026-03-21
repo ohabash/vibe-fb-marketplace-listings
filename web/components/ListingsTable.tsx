@@ -11,7 +11,7 @@ import {
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
-import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Plus, X, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, ChevronsUpDown, Search, Plus, X, Loader2, Play } from "lucide-react";
 import { IoLocationSharp } from "react-icons/io5";
 import { TbBuildingCommunity } from "react-icons/tb";
 import { MdOutlineLandscape } from "react-icons/md";
@@ -27,6 +27,7 @@ import FbReloginButton from "./FbReloginButton";
 import { Tip, TooltipProvider } from "./Tooltip";
 import AmenityFilter from "./AmenityFilter";
 import { getListingAmenities, ALL_FILTER_AMENITIES } from "@/hooks/useAmenities";
+import { uploadMedia } from "@/lib/uploadMedia";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -97,6 +98,9 @@ export default function ListingsTable() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [amenityFilters, setAmenityFilters] = useState<Set<string>>(new Set());
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const dragDepths = useRef<Record<string, number>>({});
 
   const isFiltered = globalFilter.length > 0 || amenityFilters.size > 0 || sorting.length > 0;
 
@@ -221,6 +225,11 @@ export default function ListingsTable() {
     setSelectedListing((prev) => (prev?.id === id ? null : prev));
   }, []);
 
+  const handleMediaChange = useCallback((id: string, images: string[], videos: string[]) => {
+    setListings((prev) => (prev ?? []).map((l) => (l.id === id ? { ...l, images, videos } : l)));
+    setSelectedListing((prev) => (prev?.id === id ? { ...prev, images, videos } : prev));
+  }, []);
+
   const columns = useMemo(() => [
     // Row index
     columnHelper.display({
@@ -238,12 +247,18 @@ export default function ListingsTable() {
       enableSorting: false,
       cell: (info) => {
         const imgs = info.getValue() ?? [];
+        const hasVideo = (info.row.original.videos?.length ?? 0) > 0;
         if (!imgs[0]) return <div className="w-14 h-14 rounded-xl bg-slate-100 shrink-0 ring-1 ring-black/5" />;
         return (
           <HoverCardPrimitive.Root openDelay={150} closeDelay={100}>
             <HoverCardPrimitive.Trigger asChild>
               <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 ring-1 ring-black/5 cursor-zoom-in">
                 <Image src={imgs[0]} alt="thumbnail" fill className="object-cover" sizes="56px" />
+                {hasVideo && (
+                  <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-0.5">
+                    <Play size={9} className="text-white fill-white" />
+                  </div>
+                )}
               </div>
             </HoverCardPrimitive.Trigger>
             <HoverCardPrimitive.Portal>
@@ -648,11 +663,45 @@ export default function ListingsTable() {
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row) => {
+                const id = row.original.id;
+                const isOver = dragOverId === id;
+                const isUploading = uploadingId === id;
+                return (
                 <tr
                   key={row.id}
-                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80 cursor-pointer transition-colors duration-100"
+                  className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors duration-100 ${
+                    isOver ? "bg-blue-50 ring-2 ring-inset ring-blue-400" :
+                    isUploading ? "bg-blue-50/50" :
+                    "hover:bg-slate-50/80"
+                  }`}
                   onClick={() => setSelectedListing(row.original)}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    dragDepths.current[id] = (dragDepths.current[id] ?? 0) + 1;
+                    if (dragDepths.current[id] === 1) setDragOverId(id);
+                  }}
+                  onDragLeave={() => {
+                    dragDepths.current[id] = (dragDepths.current[id] ?? 1) - 1;
+                    if (dragDepths.current[id] === 0) setDragOverId(null);
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    dragDepths.current[id] = 0;
+                    setDragOverId(null);
+                    const files = Array.from(e.dataTransfer.files).filter(
+                      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
+                    );
+                    if (!files.length) return;
+                    setUploadingId(id);
+                    try {
+                      const { images, videos } = await uploadMedia(id, files);
+                      handleMediaChange(id, images, videos);
+                    } finally {
+                      setUploadingId(null);
+                    }
+                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-3 py-1 align-middle">
@@ -660,7 +709,8 @@ export default function ListingsTable() {
                     </td>
                   ))}
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -681,6 +731,7 @@ export default function ListingsTable() {
           onDeleteComplete={handleDeleteComplete}
           onHeartChange={handleHeartChange}
           onHeart2Change={handleHeart2Change}
+          onMediaChange={handleMediaChange}
         />
       )}
     </div>

@@ -21,6 +21,7 @@ export interface Listing {
   post_id: string;
   seller: { name: string; id: string; profile_url: string };
   images: string[];
+  videos?: string[];
   url: string;
   dateAdded?: number; // Unix ms — set once on first scrape, never overwritten
   notes?: string;
