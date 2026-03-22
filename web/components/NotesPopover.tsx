@@ -90,8 +90,8 @@ export default function NotesPopover({ listing, onSave, dropdownAlign = "right" 
     <div ref={containerRef} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => (open ? closeAndFlush() : setOpen(true))}
-        className={`p-1.5 rounded-lg hover:bg-slate-100 transition-colors ${
-          hasNotes ? "text-amber-500" : "text-slate-300 opacity-40 hover:opacity-100"
+        className={`p-1.5 rounded-lg hover:bg-white/[0.08] transition-colors ${
+          hasNotes ? "text-amber-500" : "text-lo opacity-40 hover:opacity-100"
         }`}
         title={hasNotes ? "View/edit notes" : "Add notes"}
       >
@@ -99,22 +99,22 @@ export default function NotesPopover({ listing, onSave, dropdownAlign = "right" 
       </button>
 
       {open && (
-        <div className={`absolute top-full mt-1 z-50 bg-white rounded-xl border border-slate-200 shadow-lg p-3 min-w-[280px] ${dropdownAlign === "right" ? "left-0" : "right-0"}`}>
+        <div className={`absolute top-full mt-1 z-50 bg-card/80 backdrop-blur-xl rounded-xl border border-white/[0.06] shadow-[0_10px_30px_rgba(0,0,0,0.6)] p-3 min-w-[280px] ${dropdownAlign === "right" ? "left-0" : "right-0"}`}>
           <textarea
             autoFocus
             value={value}
             onChange={handleChange}
             rows={5}
             placeholder="Add notes…"
-            className="w-full text-sm text-slate-800 placeholder-slate-400 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 resize-none transition-colors"
+            className="w-full text-sm text-hi placeholder-md bg-card border border-white/[0.08] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent/25 focus:border-accent/50 resize-none transition-colors"
           />
           <div className="flex justify-between items-center mt-1.5">
-            <span className="text-[10px] text-slate-400">
+            <span className="text-[10px] text-lo">
               {saving ? "Saving…" : "Auto-saves after 700ms"}
             </span>
             <button
               onClick={closeAndFlush}
-              className="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+              className="text-xs font-medium text-lo hover:text-hi transition-colors"
             >
               Done
             </button>

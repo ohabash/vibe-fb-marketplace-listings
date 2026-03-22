@@ -26,8 +26,8 @@ export default function AmenityFilter({ value, onChange }: Props) {
           type="button"
           className={`relative flex items-center gap-1.5 text-sm font-medium rounded-xl px-3 py-1.5 border transition-colors shadow-sm shrink-0 ${
             count > 0
-              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-              : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-800"
+              ? "bg-violet-600 text-white border-violet-600 hover:bg-violet-500"
+              : "bg-card text-md border-white/[0.08] hover:border-white/15 hover:text-hi"
           }`}
         >
           <SlidersHorizontal size={14} />
@@ -45,18 +45,18 @@ export default function AmenityFilter({ value, onChange }: Props) {
           side="bottom"
           align="end"
           sideOffset={6}
-          className="z-50 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 outline-none"
+          className="z-[9999] w-64 rounded-2xl border border-white/10 bg-card/80 backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 outline-none"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-lo">
               Filter by amenity
             </span>
             {count > 0 && (
               <button
                 type="button"
                 onClick={() => onChange(new Set())}
-                className="text-[11px] font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                className="text-[11px] font-medium text-violet-400 hover:text-violet-300 transition-colors"
               >
                 Clear all
               </button>
@@ -73,15 +73,15 @@ export default function AmenityFilter({ value, onChange }: Props) {
                   type="button"
                   onClick={() => toggle(label)}
                   className={`w-full flex items-center gap-3 px-4 py-3 sm:py-2 text-sm transition-colors text-left ${
-                    checked ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"
+                    checked ? "bg-violet-500/10 text-violet-300" : "text-md hover:bg-lift"
                   }`}
                 >
                   {/* Custom checkbox */}
                   <span
                     className={`flex-none w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
                       checked
-                        ? "bg-blue-600 border-blue-600"
-                        : "border-slate-300 bg-white"
+                        ? "bg-violet-500 border-violet-500"
+                        : "border-white/20 bg-card"
                     }`}
                   >
                     {checked && (
@@ -95,7 +95,7 @@ export default function AmenityFilter({ value, onChange }: Props) {
             })}
           </div>
 
-          <Popover.Arrow className="fill-white drop-shadow-sm" />
+          <Popover.Arrow className="fill-[#1E2028] drop-shadow-sm" />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

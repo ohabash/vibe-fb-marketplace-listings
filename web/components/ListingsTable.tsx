@@ -28,6 +28,7 @@ import { Tip, TooltipProvider } from "./Tooltip";
 import AmenityFilter from "./AmenityFilter";
 import { getListingAmenities, ALL_FILTER_AMENITIES } from "@/hooks/useAmenities";
 import { uploadMedia } from "@/lib/uploadMedia";
+import { FaPaw } from "react-icons/fa";
 
 const columnHelper = createColumnHelper<Listing>();
 
@@ -57,20 +58,20 @@ function getBaths(unit_details: string[] | undefined): number | null {
 }
 
 function scaleClass(v: number) {
-  if (v === 3) return "bg-blue-50 text-blue-600 border-blue-200";
-  if (v === 2) return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  return "bg-slate-50 text-slate-500 border-slate-200";
+  if (v === 3) return "bg-violet-500/15 text-violet-300 border-violet-500/30";
+  if (v === 2) return "bg-amber-500/15 text-amber-300 border-amber-500/30";
+  return "bg-white/[0.04] text-lo border-white/[0.07]";
 }
 
 function AmenityBadges({ listing }: { listing: Listing }) {
   const badges = getListingAmenities(listing);
-  if (badges.length === 0) return <span className="text-slate-300 text-xs">—</span>;
+  if (badges.length === 0) return <span className="text-lo text-xs">—</span>;
   return (
-    <div className="flex gap-1 flex-wrap">
+    <div className="flex gap-1 flex-wrap whitespace-nowrap">
       {badges.map(({ label, emoji }) => (
         <span
           key={label}
-          className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+          className="inline-flex whitespace-nowrap items-center gap-1 bg-white/[0.07] text-hi/80 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap border border-white/[0.06]"
         >
           <span className="text-xs leading-none">{emoji}</span>
           {label}
@@ -237,7 +238,7 @@ export default function ListingsTable() {
       header: "#",
       enableSorting: false,
       cell: (info) => (
-        <span className="text-[11px] text-slate-300 tabular-nums font-medium">{info.row.index + 1}</span>
+        <span className="text-[10px] text-lo/60 tabular-nums font-mono">{info.row.index + 1}</span>
       ),
     }),
 
@@ -248,11 +249,11 @@ export default function ListingsTable() {
       cell: (info) => {
         const imgs = info.getValue() ?? [];
         const hasVideo = (info.row.original.videos?.length ?? 0) > 0;
-        if (!imgs[0]) return <div className="w-14 h-14 rounded-xl bg-slate-100 shrink-0 ring-1 ring-black/5" />;
+        if (!imgs[0]) return <div className="w-14 h-14 rounded-xl bg-panel shrink-0 ring-1 ring-white/[0.06]" />;
         return (
           <HoverCardPrimitive.Root openDelay={150} closeDelay={100}>
             <HoverCardPrimitive.Trigger asChild>
-              <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-slate-100 ring-1 ring-black/5 cursor-zoom-in">
+              <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-panel ring-1 ring-white/[0.06] cursor-zoom-in">
                 <Image src={imgs[0]} alt="thumbnail" fill className="object-cover" sizes="56px" />
                 {hasVideo && (
                   <div className="absolute bottom-1 right-1 bg-black/60 rounded-full p-0.5">
@@ -266,7 +267,7 @@ export default function ListingsTable() {
                 side="right"
                 sideOffset={10}
                 align="center"
-                className="z-50 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-black/10 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+                className="z-50 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
               >
                 <div className="relative w-64 h-64">
                   <Image src={imgs[0]} alt="preview" fill className="object-cover" sizes="256px" />
@@ -286,17 +287,17 @@ export default function ListingsTable() {
         return (
           <div className="min-w-[140px] max-w-[200px]">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-semibold text-[13px] text-slate-800 line-clamp-1 leading-tight">
+              <span className="font-medium text-[13px] text-white/90 line-clamp-1 leading-tight">
                 {info.getValue()}
               </span>
               {status === "sold" && (
-                <span className="shrink-0 text-[9px] font-bold tracking-wide uppercase bg-slate-100 text-slate-400 rounded-full px-1.5 py-0.5">Sold</span>
+                <span className="shrink-0 text-[9px] font-bold tracking-wide uppercase bg-white/[0.06] text-md rounded-full px-1.5 py-0.5">Sold</span>
               )}
               {status === "pending" && (
                 <span className="shrink-0 text-[9px] font-bold tracking-wide uppercase bg-amber-50 text-amber-500 border border-amber-200 rounded-full px-1.5 py-0.5">Pending</span>
               )}
             </div>
-            <span className="text-[9px] text-slate-300 font-mono mt-0.5 block">{id}</span>
+            <span className="text-[9px] text-lo/60 font-mono mt-0.5 block">{id}</span>
           </div>
         );
       },
@@ -317,7 +318,7 @@ export default function ListingsTable() {
       id: "price",
       header: "Price",
       cell: (info) => (
-        <span className="font-bold text-emerald-600 whitespace-nowrap text-[13px] tabular-nums">
+        <span className="font-bold text-emerald-300 whitespace-nowrap text-[13px] tabular-nums">
           {formatPrice(info.row.original)}
         </span>
       ),
@@ -338,11 +339,11 @@ export default function ListingsTable() {
           const label = [city, state].filter(Boolean).join(", ");
           const inner = (
             <div className="whitespace-nowrap">
-              <span className={`text-[12px] font-medium ${mapsUrl ? "text-blue-600" : "text-slate-700"}`}>
+              <span className={`text-[12px] font-medium ${mapsUrl ? "text-sky-300" : "text-md"}`}>
                 {label || "—"}
               </span>
               {postal_code && (
-                <span className="block text-[10px] text-slate-400 leading-tight">{postal_code}</span>
+                <span className="block text-[10px] text-lo leading-tight">{postal_code}</span>
               )}
             </div>
           );
@@ -373,11 +374,11 @@ export default function ListingsTable() {
       cell: (info) => {
         const beds = getBeds(info.row.original.unit_details);
         const baths = getBaths(info.row.original.unit_details);
-        if (beds == null && baths == null) return <span className="text-slate-300 text-xs">—</span>;
+        if (beds == null && baths == null) return <span className="text-lo text-xs">—</span>;
         return (
-          <span className="text-[12px] text-slate-700 font-medium whitespace-nowrap tabular-nums">
+          <span className="text-[12px] text-md font-medium whitespace-nowrap tabular-nums">
             {beds != null ? `${beds}bd` : ""}
-            {beds != null && baths != null ? <span className="text-slate-300 mx-0.5">·</span> : null}
+            {beds != null && baths != null ? <span className="text-lo mx-0.5">·</span> : null}
             {baths != null ? `${baths}ba` : ""}
           </span>
         );
@@ -401,9 +402,9 @@ export default function ListingsTable() {
       header: "Pets",
       cell: (info) => {
         const v = info.row.original.inferred?.pet_friendly;
-        if (v === true) return <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">🐾 Yes</span>;
-        if (v === false) return <span className="text-[11px] font-semibold bg-red-50 text-red-500 border border-red-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">No</span>;
-        return <span className="text-slate-300 text-xs">?</span>;
+        if (v === true) return <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 rounded-full px-1.5 py-0.5 whitespace-nowrap"><FaPaw size={11} /> Yes</span>;
+        if (v === false) return <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-red-500/15 text-red-300 border border-red-500/25 rounded-full px-1.5 py-0.5 whitespace-nowrap">❌ No</span>;
+        return <span className="text-lo/70 text-xs">?</span>;
       },
     }),
 
@@ -528,26 +529,31 @@ export default function ListingsTable() {
     <TooltipProvider>
     <div className="flex flex-col gap-2 sm:gap-3 h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Marketplace Listings</h1>
-        {process.env.NODE_ENV === "development" && (
-          <button
-            onClick={() => {
-              setAddOpen((o) => !o);
-              setAddState("idle");
-              setAddError("");
-              setTimeout(() => addInputRef.current?.focus(), 50);
-            }}
-            className="flex items-center gap-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-3.5 py-1.5 transition-colors shadow-sm shrink-0"
-          >
-            {addOpen ? <X size={14} /> : <Plus size={14} />}
-            {addOpen ? "Cancel" : "Add"}
-          </button>
-        )}
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h1 className="text-lg sm:text-xl font-semibold text-hi tracking-tight">Marketplace Listings</h1>
+          <p className="text-[11px] text-lo mt-0.5 hidden sm:block">Facebook Marketplace · live data</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {process.env.NODE_ENV === "development" && (
+            <button
+              onClick={() => {
+                setAddOpen((o) => !o);
+                setAddState("idle");
+                setAddError("");
+                setTimeout(() => addInputRef.current?.focus(), 50);
+              }}
+              className="flex items-center gap-1.5 text-sm font-medium bg-accent hover:bg-accent/80 text-white rounded-xl px-3.5 py-1.5 transition-colors shadow-sm shrink-0"
+            >
+              {addOpen ? <X size={14} /> : <Plus size={14} />}
+              {addOpen ? "Cancel" : "Add"}
+            </button>
+          )}
+        </div>
       </div>
 
       {process.env.NODE_ENV === "development" && addOpen && (
-        <div className="flex items-start gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 shadow-sm">
+        <div className="flex items-start gap-2 bg-card border border-white/[0.08] rounded-xl px-3.5 py-2.5 shadow-sm">
           <div className="flex-1">
             <input
               ref={addInputRef}
@@ -556,7 +562,7 @@ export default function ListingsTable() {
               onChange={(e) => { setAddUrl(e.target.value); setAddState("idle"); setAddError(""); }}
               onKeyDown={(e) => e.key === "Enter" && handleAddListing()}
               placeholder="Paste Facebook Marketplace URL…"
-              className="w-full text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
+              className="w-full text-sm text-hi placeholder-lo bg-transparent focus:outline-none"
               disabled={addState === "scraping"}
             />
             {addState === "error" && (
@@ -573,7 +579,7 @@ export default function ListingsTable() {
           <button
             onClick={handleAddListing}
             disabled={addState === "scraping" || !addUrl.trim()}
-            className="flex items-center gap-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-xs font-medium bg-accent hover:bg-accent/80 disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors shrink-0"
           >
             {addState === "scraping" ? (
               <><Loader2 size={12} className="animate-spin" /> Scraping…</>
@@ -587,13 +593,13 @@ export default function ListingsTable() {
         <div className="flex items-center gap-2">
           {/* Search — left */}
           <div className="relative flex-1 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-lo pointer-events-none" />
             <input
               type="text"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               placeholder="Search listings…"
-              className="w-full pl-8 pr-4 py-1.5 text-sm bg-white border border-slate-200 rounded-xl shadow-sm placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
+              className="w-full pl-8 pr-4 py-1.5 text-sm bg-card border border-white/[0.08] rounded-xl shadow-sm placeholder-md text-hi focus:outline-none focus:ring-2 focus:ring-accent/25 focus:border-accent/50 transition-all"
             />
           </div>
 
@@ -603,7 +609,7 @@ export default function ListingsTable() {
               <button
                 type="button"
                 onClick={clearAll}
-                className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-1.5 transition-colors shadow-sm shrink-0"
+                className="flex items-center gap-1.5 text-sm font-medium text-md hover:text-hi bg-card border border-white/[0.08] rounded-xl px-3 py-1.5 transition-colors shadow-sm shrink-0"
               >
                 <X size={14} />
                 <span className="hidden sm:inline">Clear</span>
@@ -617,16 +623,16 @@ export default function ListingsTable() {
       </div>
 
       {/* Table */}
-      <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-auto rounded-2xl border border-slate-200/80 shadow-sm bg-white">
+      <div ref={tableScrollRef} className="flex-1 min-h-0 overflow-auto rounded-2xl border border-white/[0.07] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_8px_24px_rgba(0,0,0,0.4)] bg-card">
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b border-slate-100 bg-slate-50/90 backdrop-blur-sm">
+              <tr key={hg.id} className="border-b border-white/[0.06] bg-card/95 backdrop-blur-md">
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 select-none whitespace-nowrap ${
-                      header.column.getCanSort() ? "cursor-pointer hover:text-slate-600 transition-colors" : ""
+                    className={`px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-lo select-none whitespace-nowrap ${
+                      header.column.getCanSort() ? "cursor-pointer hover:text-md transition-colors" : ""
                     }`}
                     onClick={header.column.getToggleSortingHandler()}
                   >
@@ -635,11 +641,11 @@ export default function ListingsTable() {
                       {header.column.getCanSort() && (
                         <span>
                           {header.column.getIsSorted() === "asc" ? (
-                            <ChevronUp size={11} className="text-blue-500" />
+                            <ChevronUp size={11} className="text-accent" />
                           ) : header.column.getIsSorted() === "desc" ? (
-                            <ChevronDown size={11} className="text-blue-500" />
+                            <ChevronDown size={11} className="text-accent" />
                           ) : (
-                            <ChevronsUpDown size={11} className="text-slate-300" />
+                            <ChevronsUpDown size={11} className="text-lo/50" />
                           )}
                         </span>
                       )}
@@ -652,13 +658,13 @@ export default function ListingsTable() {
           <tbody>
             {listings === null ? (
               <tr>
-                <td colSpan={columns.length} className="px-3 py-12 text-center text-slate-400 text-sm">
+                <td colSpan={columns.length} className="px-3 py-12 text-center text-lo text-sm">
                   Loading…
                 </td>
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-3 py-12 text-center text-slate-400 text-sm">
+                <td colSpan={columns.length} className="px-3 py-12 text-center text-lo text-sm">
                   No listings found.
                 </td>
               </tr>
@@ -670,10 +676,10 @@ export default function ListingsTable() {
                 return (
                 <tr
                   key={row.id}
-                  className={`border-b border-slate-100 last:border-0 cursor-pointer transition-colors duration-100 ${
-                    isOver ? "bg-blue-50 ring-2 ring-inset ring-blue-400" :
-                    isUploading ? "bg-blue-50/50" :
-                    "hover:bg-slate-50/80"
+                  className={`border-b border-white/[0.05] last:border-0 cursor-pointer transition-all duration-150 ${
+                    isOver ? "bg-accent/10 ring-2 ring-inset ring-accent" :
+                    isUploading ? "bg-accent/5" :
+                    "hover:bg-lift/80 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
                   }`}
                   onClick={() => setSelectedListing(row.original)}
                   onDragEnter={(e) => {
@@ -716,7 +722,7 @@ export default function ListingsTable() {
         </table>
       </div>
 
-      <p className="text-[11px] text-slate-400 font-medium">
+      <p className="text-[11px] text-lo/70 font-medium tabular-nums">
         {table.getFilteredRowModel().rows.length} listing{table.getFilteredRowModel().rows.length !== 1 ? "s" : ""}
       </p>
 

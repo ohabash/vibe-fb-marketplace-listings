@@ -3,12 +3,59 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #13141A;
+  --foreground: #E8EAF0;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+/* Override browser default white backgrounds on form elements */
+input,
+textarea,
+select {
+  background-color: #1E2028;
+  color: #E8EAF0;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6B7280;
+}
+
+/* Remove browser autofill yellow/white flash */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #1E2028 inset;
+  -webkit-text-fill-color: #E8EAF0;
+  caret-color: #E8EAF0;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@layer utilities {
+  /* Reusable dot-grid background — drop .dotted-bg on any element */
+  .dotted-bg {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
 }

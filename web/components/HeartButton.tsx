@@ -33,12 +33,12 @@ export default function HeartButton({ listing, onChange, field = "hearted", size
   return (
     <button
       onClick={handleClick}
-      className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+      className="p-1.5 rounded-lg hover:bg-white/[0.08] transition-colors"
       title={value ? "Remove from favorites" : "Add to favorites"}
     >
       <Heart
         size={size}
-        className={value ? activeClass : "text-slate-300"}
+        className={value ? activeClass : "text-lo/60"}
       />
     </button>
   );

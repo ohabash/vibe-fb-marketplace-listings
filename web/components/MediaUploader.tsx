@@ -42,7 +42,7 @@ export default function MediaUploader({ listingId, onUploadComplete }: Props) {
       <button
         onClick={() => inputRef.current?.click()}
         disabled={uploading}
-        className="w-full flex items-center justify-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-700 border border-dashed border-slate-300 hover:border-slate-400 rounded-xl py-2.5 transition-colors disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 text-xs font-medium text-lo hover:text-md border border-dashed border-white/[0.1] hover:border-white/20 rounded-xl py-2.5 transition-colors disabled:opacity-50"
       >
         {uploading ? (
           <><Loader2 size={13} className="animate-spin" /> Uploading…</>
@@ -50,7 +50,7 @@ export default function MediaUploader({ listingId, onUploadComplete }: Props) {
           <><ImagePlus size={13} /> Add photos / videos</>
         )}
       </button>
-      {error && <p className="text-xs text-red-500 mt-1 text-center">{error}</p>}
+      {error && <p className="text-xs text-red-400 mt-1 text-center">{error}</p>}
     </div>
   );
 }
