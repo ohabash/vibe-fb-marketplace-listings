@@ -35,8 +35,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Listing not found" }, { status: 404 });
   }
 
-  const images: string[] = listing.images ?? [];
-  const videos: string[] = listing.videos ?? [];
+  // Firebase RTDB returns arrays as plain objects ({0: "...", 1: "..."}) — normalize to real arrays
+  const toArray = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter(Boolean) : v && typeof v === "object" ? Object.values(v as Record<string, string>).filter(Boolean) : [];
+
+  const images: string[] = toArray(listing.images);
+  const videos: string[] = toArray(listing.videos);
 
   const timestamp = Date.now();
 

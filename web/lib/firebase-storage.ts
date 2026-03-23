@@ -67,8 +67,9 @@ export async function uploadToStorage(
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": contentType,
+        "Content-Length": String(buffer.byteLength),
       },
-      body: buffer as unknown as BodyInit,
+      body: new Uint8Array(buffer),
     }
   );
 

@@ -259,11 +259,22 @@ export default function ListingModal({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HeartButton listing={current} onChange={onHeartChange} size={18} />
-          <HeartButton listing={current} onChange={onHeart2Change} field="hearted2" size={18} />
+          <HeartButton
+            listing={current}
+            onChange={onHeart2Change}
+            field="hearted2"
+            size={18}
+          />
           <ActionMenu
             listing={current}
-            onRescrapeComplete={(updated) => { setCurrent(updated); onRescrapeComplete(updated); }}
-            onDeleteComplete={(id) => { onDeleteComplete(id); onClose(); }}
+            onRescrapeComplete={(updated) => {
+              setCurrent(updated);
+              onRescrapeComplete(updated);
+            }}
+            onDeleteComplete={(id) => {
+              onDeleteComplete(id);
+              onClose();
+            }}
             variant="button"
           />
           <a
@@ -282,7 +293,10 @@ export default function ListingModal({
       {(current.unit_details?.length ?? 0) > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {(current.unit_details ?? []).map((d, i) => (
-            <span key={i} className="text-xs font-medium bg-white/[0.08] text-hi/80 border border-white/[0.1] px-2.5 py-1 rounded-full">
+            <span
+              key={i}
+              className="text-xs font-medium bg-white/[0.08] text-hi/80 border border-white/[0.1] px-2.5 py-1 rounded-full"
+            >
               {d}
             </span>
           ))}
@@ -293,26 +307,58 @@ export default function ListingModal({
       <div className="rounded-xl border border-white/[0.1] overflow-hidden divide-y divide-white/[0.07]">
         {(() => {
           const { latitude, longitude } = current.location?.coordinates ?? {};
-          const locLabel = [current.location?.city, current.location?.state, current.location?.country]
-            .filter(Boolean).join(", ") + (current.location?.postal_code ? ` (${current.location.postal_code})` : "");
-          const mapsUrl = latitude != null && longitude != null
-            ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
+          const locLabel =
+            [
+              current.location?.city,
+              current.location?.state,
+              current.location?.country,
+            ]
+              .filter(Boolean)
+              .join(", ") +
+            (current.location?.postal_code
+              ? ` (${current.location.postal_code})`
+              : "");
+          const mapsUrl =
+            latitude != null && longitude != null
+              ? `https://www.google.com/maps?q=${latitude},${longitude}`
+              : null;
           return (
             <InfoRow icon={<MapPin size={13} />} label="Location">
               {mapsUrl ? (
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sky-300 hover:text-sky-200 transition-colors">
-                  <IoLocationSharp size={13} className="text-red-400 shrink-0" />
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sky-300 hover:text-sky-200 transition-colors"
+                >
+                  <IoLocationSharp
+                    size={13}
+                    className="text-red-400 shrink-0"
+                  />
                   {locLabel}
                 </a>
-              ) : locLabel}
+              ) : (
+                locLabel
+              )}
             </InfoRow>
           );
         })()}
-        <InfoRow icon={<Calendar size={13} />} label="Posted">{formatDate(current.posted_at)}</InfoRow>
-        <InfoRow icon={<Tag size={13} />} label="Category">{current.category || "—"}</InfoRow>
-        <InfoRow icon={<Package size={13} />} label="Availability">{current.availability || "—"}</InfoRow>
+        <InfoRow icon={<Calendar size={13} />} label="Posted">
+          {formatDate(current.posted_at)}
+        </InfoRow>
+        <InfoRow icon={<Tag size={13} />} label="Category">
+          {current.category || "—"}
+        </InfoRow>
+        <InfoRow icon={<Package size={13} />} label="Availability">
+          {current.availability || "—"}
+        </InfoRow>
         <InfoRow icon={<User size={13} />} label="Seller">
-          <a href={current.seller.profile_url} target="_blank" rel="noopener noreferrer" className="text-sky-300 hover:text-sky-200 transition-colors">
+          <a
+            href={current.seller.profile_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-300 hover:text-sky-200 transition-colors"
+          >
             {current.seller.name || "—"}
           </a>
         </InfoRow>
@@ -321,35 +367,94 @@ export default function ListingModal({
       {/* Inferred ratings */}
       <div className="border border-white/[0.1] rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-white/[0.08] bg-white/[0.03]">
-          <p className="text-xs font-semibold uppercase tracking-wider text-lo">Your Assessment</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-lo">
+            Your Assessment
+          </p>
         </div>
         <div className="p-4">
           <div className="flex flex-wrap gap-5">
-            <InferredToggle label="Pet Friendly" emoji="🐾"
-              options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
+            <InferredToggle
+              label="Pet Friendly"
+              emoji="🐾"
+              options={
+                [
+                  ["unknown", "?"],
+                  [true, "Yes"],
+                  [false, "No"],
+                ] as const
+              }
               value={inferred.pet_friendly}
-              activeClass={(v) => v === true ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/30" : v === false ? "bg-red-500/25 text-red-300 border-red-500/30" : "bg-white/[0.06] text-md"}
+              activeClass={(v) =>
+                v === true
+                  ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/30"
+                  : v === false
+                    ? "bg-red-500/25 text-red-300 border-red-500/30"
+                    : "bg-white/[0.06] text-md"
+              }
               onChange={(v) => handleInferredChange({ pet_friendly: v })}
             />
-            <InferredToggle label="Has View" emoji="🏙️"
-              options={[[1, "1"], [2, "2"], [3, "3"]] as const}
+            <InferredToggle
+              label="Has View"
+              emoji="🏙️"
+              options={
+                [
+                  [1, "1"],
+                  [2, "2"],
+                  [3, "3"],
+                ] as const
+              }
               value={inferred.has_view}
-              activeClass={(v) => v === 3 ? "bg-violet-500/25 text-violet-300 border-violet-500/30" : v === 2 ? "bg-amber-500/25 text-amber-300 border-amber-500/30" : "bg-white/[0.06] text-md"}
+              activeClass={(v) =>
+                v === 3
+                  ? "bg-violet-500/25 text-violet-300 border-violet-500/30"
+                  : v === 2
+                    ? "bg-amber-500/25 text-amber-300 border-amber-500/30"
+                    : "bg-white/[0.06] text-md"
+              }
               onChange={(v) => handleInferredChange({ has_view: v })}
             />
-            <InferredToggle label="Neighborhood" emoji="🏘️"
-              options={[[1, "1"], [2, "2"], [3, "3"]] as const}
+            <InferredToggle
+              label="Neighborhood"
+              emoji="🏘️"
+              options={
+                [
+                  [1, "1"],
+                  [2, "2"],
+                  [3, "3"],
+                ] as const
+              }
               value={inferred.neighborhood}
-              activeClass={(v) => v === 3 ? "bg-violet-500/25 text-violet-300 border-violet-500/30" : v === 2 ? "bg-amber-500/25 text-amber-300 border-amber-500/30" : "bg-white/[0.06] text-md"}
+              activeClass={(v) =>
+                v === 3
+                  ? "bg-violet-500/25 text-violet-300 border-violet-500/30"
+                  : v === 2
+                    ? "bg-amber-500/25 text-amber-300 border-amber-500/30"
+                    : "bg-white/[0.06] text-md"
+              }
               onChange={(v) => handleInferredChange({ neighborhood: v })}
             />
           </div>
           <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-white/[0.08]">
             {AMENITY_TOGGLES.map(({ key, label, emoji }) => (
-              <InferredToggle key={key} label={label} emoji={emoji}
-                options={[["unknown", "?"], [true, "Yes"], [false, "No"]] as const}
+              <InferredToggle
+                key={key}
+                label={label}
+                emoji={emoji}
+                options={
+                  [
+                    ["unknown", "?"],
+                    [true, "Yes"],
+                    [false, "No"],
+                  ] as const
+                }
                 value={(inferred[key] ?? "unknown") as "unknown" | boolean}
-                activeClass={(v) => v === true ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/30" : v === false ? "bg-red-500/25 text-red-300 border-red-500/30" : "bg-white/[0.06] text-md"}
+                activeClass={(v) =>
+                  v === true
+                    ? "bg-emerald-500/25 text-emerald-300 border-emerald-500/30"
+                    : v === false
+                      ? "bg-red-500/25 text-red-300 border-red-500/30"
+                      : "bg-white/[0.06] text-md"
+                }
                 onChange={(v) => handleInferredChange({ [key]: v })}
               />
             ))}
@@ -358,34 +463,64 @@ export default function ListingModal({
       </div>
 
       {/* Description */}
-      {current.description && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-md mb-1.5">Description</p>
-          <p className="text-sm text-hi/85 whitespace-pre-wrap leading-relaxed">
-            {descExpanded ? current.description : shortDesc}
+      <div className="border border-white/[0.1] rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/[0.08] bg-white/[0.03]">
+          <p className="text-xs font-semibold uppercase tracking-wider text-lo">
+            Description
           </p>
-          {current.description.length > 300 && (
-            <button onClick={() => setDescExpanded(!descExpanded)} className="text-xs text-accent hover:underline mt-1">
-              {descExpanded ? "Show less" : "Show more"}
-            </button>
+        </div>
+        <div className="p-4">
+          {current.description && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-md mb-1.5">
+                Description
+              </p>
+              <p className="text-sm text-hi/85 whitespace-pre-wrap leading-relaxed">
+                {descExpanded ? current.description : shortDesc}
+              </p>
+              {current.description.length > 300 && (
+                <button
+                  onClick={() => setDescExpanded(!descExpanded)}
+                  className="text-xs text-yellow-500 hover:underline mt-1"
+                >
+                  {descExpanded ? "Show less" : "Show more"}
+                </button>
+              )}
+            </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Notes */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-md">Notes</p>
-          {saving && <span className="text-xs text-lo animate-pulse">Saving…</span>}
-          {saved && <span className="text-xs text-emerald-400 font-medium">Saved ✓</span>}
+      <div className="border border-white/[0.1] rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-white/[0.08] bg-white/[0.03] flex items-center justify-between">
+          <div className="flex justify-start">
+            <p className="text-xs font-semibold uppercase tracking-wider text-lo">
+              Notes
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <div className="flex items-center justify-between mb-1.5">
+              {saving && (
+                <span className="text-xs text-lo animate-pulse">Saving…</span>
+              )}
+              {saved && (
+                <span className="text-xs text-emerald-400 font-medium">
+                  Saved ✓
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <textarea
-          value={notes}
-          onChange={handleNotesChange}
-          placeholder="Add your notes about this listing…"
-          rows={3}
-          className="w-full text-sm border border-white/[0.1] rounded-xl p-3 bg-white/[0.04] text-hi placeholder-lo focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 resize-none transition-colors"
-        />
+        <div className="p-1">
+          <textarea
+            value={notes}
+            onChange={handleNotesChange}
+            placeholder="Add your notes about this listing…"
+            rows={3}
+            className="bg-transparent border-none w-full p-4 border-none outline-none"
+          />
+        </div>
       </div>
     </div>
   );
